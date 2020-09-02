@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import aiofiles
 import tenacity
+import itertools
 
 
 @tenacity.retry(
@@ -50,10 +51,16 @@ async def main():
 		tasks_pokemon = (asyncio.create_task(bound_fetch(session, sem, f'{URL}/dump-pokemon', json={'gen': gen_info['gen'], 'language': LANGUAGE, 'alias': to_alias(pokemon['name'])})) for gen_info in json_basics for pokemon in gen_info['pokemon'])
 		json_pokemon = [{**item['request'], **item['response']} for item in await asyncio.gather(*tasks_pokemon) if item['response'] is not None]
 
-	async with aiofiles.open(f'output/smogon_analyses.json', 'w', newline='', encoding='utf-8') as fd:
-		await fd.write(ujson.dumps(json_pokemon, ensure_ascii=False, indent='\t'))
+		# For each analysis in json_pokemon, look up in which other languages there are analyses for that pokémon/gen and fetch them as well.
+		tasks_multilang = (asyncio.create_task(bound_fetch(session, sem, f'{URL}/dump-pokemon', json={'gen': analysis['gen'], 'language': lang, 'alias': analysis['alias']})) for analysis in json_pokemon for lang in analysis['languages'] if lang != LANGUAGE)
+		json_multilang = [{**item['request'], **item['response']} for item in await asyncio.gather(*tasks_multilang) if item['response'] is not None]
 
-	logging.debug(f'Analyses downloaded: {len(json_pokemon)}')
+	analyses = list(itertools.chain(json_pokemon, json_multilang))
+
+	async with aiofiles.open(f'output/smogon_analyses.json', 'w', newline='', encoding='utf-8') as fd:
+		await fd.write(ujson.dumps(analyses, ensure_ascii=False, indent='\t'))
+
+	logging.debug(f'Analyses downloaded: {len(analyses)}')
 
 
 
@@ -61,7 +68,7 @@ if __name__ == '__main__':
 	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
 	try:
-		import uvloop  # Unavailable on Windows
+		import uvloop  # Unavailable on Windows, optional on Unix.
 	except ModuleNotFoundError:
 		# aiohttp version 3.6.2 raises RuntimeError('Event loop is closed') at the end on Windows if using ProactorEventLoop (which is the default on Windows in Python 3.8+).
 		if sys.platform.startswith('win') and sys.version_info[:2] >= (3, 8):
