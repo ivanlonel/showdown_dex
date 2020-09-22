@@ -16,6 +16,9 @@ def camel_to_snake_case(name):
 async def init_tmp_table(conn, file_path, each_file_line_is_a_json_object=False):
 	tmp = f'tmp_{file_path.stem}'
 
+	if file_path.parts[-2] == 'text':
+		tmp += '_text'
+
 	await conn.execute(f'CREATE TEMPORARY TABLE {tmp} (obj jsonb) ON COMMIT DROP')
 
 	if each_file_line_is_a_json_object:
@@ -67,12 +70,24 @@ async def main():
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'abilities.ts')
 			await queries.populate_abilities(conn)
 
+			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'abilities.ts')
+			await queries.populate_abilities_text(conn)
+
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'moves.ts')
 			await queries.populate_moves(conn)
+
+			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'moves.ts')
+			await queries.populate_moves_text(conn)
 
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'pokedex.ts')
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'items.ts')
 			await queries.populate_pokedex(conn)
+
+			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'pokedex.ts')
+			await queries.populate_pokedex_text(conn)
+
+			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'items.ts')
+			await queries.populate_items_text(conn)
 
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'learnsets.ts')
 			await queries.populate_learnsets(conn)

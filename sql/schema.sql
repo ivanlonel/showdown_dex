@@ -224,8 +224,6 @@ CREATE TABLE IF NOT EXISTS ability (
 	ability_id text PRIMARY KEY,
 	ability_name text UNIQUE NOT NULL,
 	ability_num smallint UNIQUE NOT NULL,
-	short_desc text NOT NULL,
-	descr text,
 	rating numeric,
 	is_nonstandard enum_nonstandard,
 	is_unbreakable boolean,
@@ -297,12 +295,41 @@ CREATE TABLE IF NOT EXISTS ability_priority (
 	on_type_priority numeric
 );
 
+CREATE TABLE IF NOT EXISTS ability_text (
+	ability_id text PRIMARY KEY REFERENCES ability,
+	ability_name text UNIQUE NOT NULL,
+	short_desc text NOT NULL,
+	descr text,
+	short_desc_gen3 text,
+	desc_gen3 text,
+	short_desc_gen4 text,
+	desc_gen4 text,
+	short_desc_gen5 text,
+	desc_gen5 text,
+	short_desc_gen6 text,
+	desc_gen6 text,
+	short_desc_gen7 text,
+	desc_gen7 text,
+	start_txt text,
+	end_txt text,
+	activate text,
+	activate_no_target text,
+	add_item text,
+	block text,
+	boost text,
+	cant text,
+	damage text,
+	move_txt text,
+	change_ability text,
+	transform_txt text,
+	transform_end text
+);
+
+
 CREATE TABLE IF NOT EXISTS t_move (
 	move_id text PRIMARY KEY,
 	move_name text UNIQUE NOT NULL,
 	move_num smallint NOT NULL,  -- All G-Max moves have the same "num". So do all Hidden Power types.
-	short_desc text NOT NULL,
-	descr text,
 	is_nonstandard enum_nonstandard,
 	jb_condition jsonb,
 	base_power smallint NOT NULL,
@@ -424,6 +451,58 @@ COMMENT ON COLUMN move_flags.reflectable IS 'Bounced back to the original user b
 COMMENT ON COLUMN move_flags.snatch      IS 'Can be stolen from the original user and instead used by another Pokemon using Snatch.';
 COMMENT ON COLUMN move_flags.sound       IS 'Has no effect on Pokemon with the Ability Soundproof.';
 
+CREATE TABLE IF NOT EXISTS t_move_text (
+	move_id text PRIMARY KEY REFERENCES t_move,
+	move_name text UNIQUE NOT NULL,
+	short_desc text NOT NULL,
+	descr text,
+	short_desc_gen1 text,
+	desc_gen1 text,
+	short_desc_gen2 text,
+	desc_gen2 text,
+	short_desc_gen3 text,
+	desc_gen3 text,
+	short_desc_gen4 text,
+	desc_gen4 text,
+	short_desc_gen5 text,
+	desc_gen5 text,
+	short_desc_gen6 text,
+	desc_gen6 text,
+	short_desc_gen7 text,
+	desc_gen7 text,
+	start_txt text,
+	start_gen1 text,
+	start_from_item text,
+	start_from_z_effect text,
+	already_started text,
+	end_txt text,
+	end_from_item text,
+	fail text,
+	fail_select text,
+	fail_too_heavy text,
+	fail_wrong_forme text,
+	activate text,
+	add_item text,
+	remove_item text,
+	take_item text,
+	block text,
+	block_self text,
+	boost text,
+	clear_boost text,
+	cant text,
+	damage text,
+	heal text,
+	move_txt text,
+	real_move text,
+	prepare_txt text,
+	switch_out text,
+	change_ability text,
+	type_change text,
+	mega_no_item text,
+	transform_txt text,
+	upkeep text
+);
+
 
 CREATE TABLE IF NOT EXISTS base_species (
 	species_num smallint PRIMARY KEY,
@@ -496,8 +575,6 @@ CREATE TABLE IF NOT EXISTS item (
 	item_num smallint,  -- position in this sheet: https://play.pokemonshowdown.com/sprites/itemicons-sheet.png?g8
 	spritenum smallint,
 	gen smallint,
-	descr text,
-	short_desc text,
 	is_nonstandard enum_nonstandard,
 	jb_condition jsonb,  -- not worth it.
 	natural_gift_base_power smallint CHECK ((natural_gift_base_power IS NULL) = (natural_gift_type IS NULL)),
@@ -643,6 +720,33 @@ CREATE TABLE IF NOT EXISTS pokemon_evo (
     evo_move text REFERENCES t_move (move_name),  -- use move_id instead?
     evo_condition text
 );
+
+CREATE TABLE IF NOT EXISTS pokemon_text (
+	pokemon_id text PRIMARY KEY REFERENCES pokemon,
+	pokemon_name text UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS item_text (
+	item_id text PRIMARY KEY REFERENCES item,
+	item_name text UNIQUE NOT NULL,
+	short_desc text,
+	descr text,
+	desc_gen2 text,
+	short_desc_gen3 text,
+	desc_gen3 text,
+	desc_gen4 text,
+	desc_gen5 text,
+	desc_gen6 text,
+	desc_gen7 text,
+	start_txt text,
+	end_txt text,
+	activate text,
+	block text,
+	damage text,
+	heal text,
+	transform_txt text
+);
+
 
 CREATE TABLE IF NOT EXISTS pokemon_event (
 	pokemon_id text REFERENCES pokemon,

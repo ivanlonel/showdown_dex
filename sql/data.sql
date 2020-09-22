@@ -1,5 +1,5 @@
--- name: populate_generation#
--- Must have all elements in a single jsonb object. Will fail if tmp_smogon_gens has multiple rows
+-- name: populate_generation!
+-- Exoects all elements in a single jsonb object.
 INSERT INTO generation (gen_id, gen_name, games)
 	SELECT pos, elem->>'shorthand', string_to_array(elem->>'name', '/')
 	FROM tmp_smogon_gens,
@@ -41,12 +41,11 @@ INSERT INTO type_x_type (defending, attacking, multiplier)
 INSERT INTO ability
 	SELECT (jsonb_populate_record(null::ability, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
 	FROM tmp_abilities,
-		LATERAL jsonb_each(obj - '{alias, name, num, desc, condition}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'ability_id', obj->'alias',
 			'ability_name', obj->'name',
 			'ability_num', obj->'num',
-			'descr', obj->'desc',
 			'jb_condition', obj->'condition'
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys;
@@ -74,18 +73,37 @@ INSERT INTO ability_priority
 --DROP TABLE IF EXISTS tmp_abilities;
 
 
+-- name: populate_abilities_text!
+-- Populate table ability_text.
+INSERT INTO ability_text
+	SELECT (jsonb_populate_record(null::ability_text, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
+	FROM tmp_abilities_text,
+		LATERAL jsonb_each(obj - '{alias, name, desc, start, end, move, transform}'::text[]) AS J(k, v),
+		LATERAL jsonb_build_object(
+			'ability_id', obj->'alias',
+			'ability_name', obj->'name',
+			'descr', obj->'desc',
+			'start_txt', obj->'start',
+			'end_txt', obj->'end',
+			'move_txt', obj->'move',
+			'transform_txt',  obj->'transform'
+		) AS jsonb_with_renamed_keys
+	GROUP BY jsonb_with_renamed_keys;
+
+--DROP TABLE IF EXISTS tmp_abilities_text;
+
+
 
 -- name: populate_moves#
 -- Populate tables t_move and move_flags.
 INSERT INTO t_move
 	SELECT (jsonb_populate_record(null::t_move, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
 	FROM tmp_moves,
-		LATERAL jsonb_each(obj - '{alias, name, num, desc, condition, accuracy, type, isMax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, isMax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'move_id', obj->'alias',
 			'move_name', obj->'name',
 			'move_num', obj->'num',
-			'descr', obj->'desc',
 			'jb_condition', obj->'condition',
 			CASE obj->>'accuracy' WHEN 'true' THEN 'always_hit' ELSE 'accuracy' END, obj->'accuracy',
 			'type_name', obj->'type',
@@ -105,6 +123,28 @@ INSERT INTO move_flags
 	WHERE obj->'flags' @? '$.*';  -- obj->'flags' IS NOT NULL AND obj->'flags' <> '{}'::jsonb;
 
 --DROP TABLE IF EXISTS tmp_moves;
+
+
+-- name: populate_moves_text!
+-- Populate table t_move_text.
+INSERT INTO t_move_text
+	SELECT (jsonb_populate_record(null::t_move_text, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
+	FROM tmp_moves_text,
+		LATERAL jsonb_each(obj - '{alias, name, desc, start, end, move, prepare, transform}'::text[]) AS J(k, v),
+		LATERAL jsonb_build_object(
+			'move_id', obj->'alias',
+			'move_name', obj->'name',
+			'descr', obj->'desc',
+			'start_txt', obj->'start',
+			'end_txt', obj->'end',
+			'move_txt', obj->'move',
+			'prepare_txt', obj->'prepare',
+			'transform_txt',  obj->'transform'
+		) AS jsonb_with_renamed_keys
+	WHERE obj->>'alias' <> 'magikarpsrevenge'
+	GROUP BY jsonb_with_renamed_keys;
+
+--DROP TABLE IF EXISTS tmp_moves_text;
 
 
 
@@ -181,12 +221,11 @@ INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_
 INSERT INTO item
 	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
 	FROM tmp_items,
-		LATERAL jsonb_each(obj - '{alias, name, num, desc, condition, naturalGift, zMove}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition, naturalGift, zMove}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'item_id', obj->'alias',
 			'item_name', obj->'name',
 			'item_num', obj->'num',
-			'descr', obj->'desc',
 			'jb_condition', obj->'condition',
 			'natural_gift_base_power', obj->'naturalGift'->'basePower',
 			'natural_gift_type', obj->'naturalGift'->'type',
@@ -310,6 +349,40 @@ INSERT INTO pokemon_evo (pokemon_id, evo_id, evo_level, evo_type, evo_item, evo_
 --DROP TABLE IF EXISTS tmp_pokedex;
 
 
+-- name: populate_pokedex_text!
+-- Populate table pokemon_text.
+INSERT INTO pokemon_text (pokemon_id, pokemon_name)
+	SELECT obj->>'alias', obj->>'name'
+	FROM tmp_pokedex_text
+	WHERE obj->>'name' NOT LIKE '%-Gmax';
+
+--DROP TABLE IF EXISTS tmp_pokedex_text;
+
+
+-- name: populate_items_text!
+-- Populate table item_text.
+WITH modifying_cte AS (  -- Lazy workaround to missing items
+	INSERT INTO item (item_id, item_name)
+		SELECT obj->>'alias', obj->>'name'
+		FROM tmp_items_text
+		WHERE NOT EXISTS(SELECT 1 FROM item I WHERE obj->>'alias' = I.item_id)
+)
+INSERT INTO item_text
+	SELECT (jsonb_populate_record(null::item_text, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
+	FROM tmp_items_text,
+		LATERAL jsonb_each(obj - '{alias, name, desc, start, end, transform}'::text[]) AS J(k, v),
+		LATERAL jsonb_build_object(
+			'item_id', obj->'alias',
+			'item_name', obj->'name',
+			'descr', obj->'desc',
+			'start_txt', obj->'start',
+			'end_txt', obj->'end',
+			'transform_txt',  obj->'transform'
+		) AS jsonb_with_renamed_keys
+	GROUP BY jsonb_with_renamed_keys;
+
+--DROP TABLE IF EXISTS tmp_items_text;
+
 
 -- name: populate_learnsets#
 -- Populate tables pokemon_event, pokemon_event_ability, pokemon_event_move and learnset. Also updates column event_only from table pokemon.
@@ -386,7 +459,7 @@ INSERT INTO learnset (pokemon_id, move_id, generation, source_id, event_index, l
 
 
 -- name: populate_analyses#
--- Must have all elements in a single jsonb object. Will fail if tmp_smogon_analyses has multiple rows.
+-- Expects all elements in a single jsonb object.
 INSERT INTO analysis (pokemon_id, gen, lang, format, html_overview, html_comments, credits)
 	SELECT
 		CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END,

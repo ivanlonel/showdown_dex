@@ -25,7 +25,7 @@ def dict_of_dicts_2_iter_of_dicts(dict_of_dicts, key_name):
 
 # I don't feel like going through the hassle of creating an actual typescript parser
 def extract_json_from_ts(ts_str):
-	trimmed_str = ts_str.split('} = ', 1)[1].rsplit('}', 1)[0] + '}'
+	trimmed_str = ''.join(ts_str.split(' = ', 1)[1:]).rsplit('}', 1)[0] + '}'
 	functionless_str = regex.sub(
 		r'^(\s+)[^\d\W]\w*\s*\(.*?\)\s*\{.*?\n\1\},?',
 		'',
@@ -38,7 +38,7 @@ def extract_json_from_ts(ts_str):
 if __name__ == '__main__':
 	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 
-	for filename in ('abilities', 'items', 'moves', 'typechart', 'pokedex', 'learnsets'):
+	for filename in ('typechart', 'abilities', 'text/abilities', 'items', 'text/items', 'moves', 'text/moves', 'pokedex', 'text/pokedex', 'learnsets'):
 		with open(f'./pokemon-showdown/data/{filename}.ts', 'r') as f:
 			json_dict = extract_json_from_ts(f.read())
 
@@ -47,6 +47,6 @@ if __name__ == '__main__':
 
 		logging.debug(list(reduce_generator(longest_common_subsequence, (d.keys() for d in dicts))))
 
-		with open(f'./output/{filename}.json', 'w', encoding='utf-8') as f:
-			json.dump(list(standardize(dicts)), f, ensure_ascii=False, indent='\t')
-			#json.dump(dicts, f, ensure_ascii=False, indent='\t')
+		with open(f'./json/{filename}.json', 'w', encoding='utf-8') as f:
+			#json.dump(list(standardize(dicts)), f, ensure_ascii=False, indent='\t')
+			json.dump(dicts, f, ensure_ascii=False, indent='\t')

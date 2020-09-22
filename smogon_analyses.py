@@ -16,7 +16,6 @@ def load_nested_strings_as_json(jso):
 		try:
 			jso = json.loads(jso, object_hook=load_nested_strings_as_json)
 		except ValueError:
-			#jso = encode_escapes(jso)
 			jso = json.dumps(jso, ensure_ascii=False)[1:-1]  # escape \ and ".
 	return jso
 
@@ -30,7 +29,6 @@ def load_nested_strings_as_json(jso):
                )
 async def fetch(session, url, json=None):
 	async with session.post(url, json=json, raise_for_status=True) as response:
-		#return await response.json()
 		return load_nested_strings_as_json(await response.json())
 
 async def bound_fetch(session, semaphore, url, json=None):
