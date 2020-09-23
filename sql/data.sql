@@ -326,13 +326,13 @@ INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_name)
 	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax'
 		AND obj->>'alias' <> 'missingno';  -- missingno's ability is an empty string
 
-WITH modifying_cte AS (  -- Lazy workaround to missing items
-	INSERT INTO item (item_id, item_name)
-		SELECT DISTINCT to_id(obj->>'evoItem'), obj->>'evoItem'
-		FROM tmp_pokedex T
-		WHERE obj->>'evoItem' IS NOT NULL
-			AND NOT EXISTS (SELECT 1 FROM item I WHERE T.obj->>'evoItem' = I.item_name)
-)
+--WITH modifying_cte AS (  -- Lazy workaround to missing items
+--	INSERT INTO item (item_id, item_name)
+--		SELECT DISTINCT to_id(obj->>'evoItem'), obj->>'evoItem'
+--		FROM tmp_pokedex T
+--		WHERE obj->>'evoItem' IS NOT NULL
+--			AND NOT EXISTS (SELECT 1 FROM item I WHERE T.obj->>'evoItem' = I.item_name)
+--)
 INSERT INTO pokemon_evo (pokemon_id, evo_id, evo_level, evo_type, evo_item, evo_move, evo_condition)
 	SELECT
 		P.pokemon_id,
