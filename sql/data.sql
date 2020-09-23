@@ -263,18 +263,18 @@ INSERT INTO item_user (item_id, pokemon_name)
 --DROP TABLE IF EXISTS tmp_items;
 
 
-WITH modifying_cte AS (  -- Lazy workaround to missing items
-	INSERT INTO item (item_id, item_name)
-		SELECT to_id(required_item_name), required_item_name
-		FROM (
-			SELECT DISTINCT COALESCE(TP.obj->>'requiredItem', value) AS required_item_name
-			FROM tmp_pokedex TP
-				LEFT JOIN LATERAL jsonb_array_elements_text(TP.obj->'requiredItems')
-					ON TRUE
-		) S
-		WHERE required_item_name IS NOT NULL
-			AND NOT EXISTS (SELECT 1 FROM item I WHERE S.required_item_name = I.item_name)
-)
+--WITH modifying_cte AS (  -- Lazy workaround to missing items
+--	INSERT INTO item (item_id, item_name)
+--		SELECT to_id(required_item_name), required_item_name
+--		FROM (
+--			SELECT DISTINCT COALESCE(TP.obj->>'requiredItem', value) AS required_item_name
+--			FROM tmp_pokedex TP
+--				LEFT JOIN LATERAL jsonb_array_elements_text(TP.obj->'requiredItems')
+--					ON TRUE
+--		) S
+--		WHERE required_item_name IS NOT NULL
+--			AND NOT EXISTS (SELECT 1 FROM item I WHERE S.required_item_name = I.item_name)
+--)
 INSERT INTO pokemon_forme_required_item (species_num, forme_index, required_item_name)
 	SELECT *
 	FROM (
@@ -361,12 +361,12 @@ INSERT INTO pokemon_text (pokemon_id, pokemon_name)
 
 -- name: populate_items_text!
 -- Populate table item_text.
-WITH modifying_cte AS (  -- Lazy workaround to missing items
-	INSERT INTO item (item_id, item_name)
-		SELECT obj->>'alias', obj->>'name'
-		FROM tmp_items_text
-		WHERE NOT EXISTS(SELECT 1 FROM item I WHERE obj->>'alias' = I.item_id)
-)
+--WITH modifying_cte AS (  -- Lazy workaround to missing items
+--	INSERT INTO item (item_id, item_name)
+--		SELECT obj->>'alias', obj->>'name'
+--		FROM tmp_items_text
+--		WHERE NOT EXISTS(SELECT 1 FROM item I WHERE obj->>'alias' = I.item_id)
+--)
 INSERT INTO item_text
 	SELECT (jsonb_populate_record(null::item_text, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
 	FROM tmp_items_text,
@@ -514,14 +514,14 @@ INSERT INTO moveset_ability (analysis_id, moveset_index, ability_name)
 	FROM tmp_movesets,
 		LATERAL jsonb_array_elements_text(jb_moveset->'abilities');
 
-WITH modifying_cte AS (  -- Lazy workaround to missing items
-	INSERT INTO item (item_id, item_name)
-		SELECT DISTINCT to_id(value), value
-		FROM tmp_movesets,
-			LATERAL jsonb_array_elements_text(jb_moveset->'items')
-		WHERE value <> 'No Item'
-			AND NOT EXISTS(SELECT 1 FROM item I WHERE value = I.item_name)
-)
+--WITH modifying_cte AS (  -- Lazy workaround to missing items
+--	INSERT INTO item (item_id, item_name)
+--		SELECT DISTINCT to_id(value), value
+--		FROM tmp_movesets,
+--			LATERAL jsonb_array_elements_text(jb_moveset->'items')
+--		WHERE value <> 'No Item'
+--			AND NOT EXISTS(SELECT 1 FROM item I WHERE value = I.item_name)
+--)
 INSERT INTO moveset_item (analysis_id, moveset_index, item_name)
 	SELECT
 		analysis_id,

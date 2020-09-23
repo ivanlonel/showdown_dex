@@ -23,11 +23,11 @@ def dict_of_dicts_2_iter_of_dicts(dict_of_dicts, key_name):
 	for k, v in dict_of_dicts.items():
 		yield{key_name: k, **v}
 
-# I don't feel like going through the hassle of creating an actual typescript parser
+# Maybe when pyjsparser gets extended support for ECMAScript 6 I can drop the regex in favor of a proper parser.
 def extract_json_from_ts(ts_str):
 	trimmed_str = ''.join(ts_str.split(' = ', 1)[1:]).rsplit('}', 1)[0] + '}'
 	functionless_str = regex.sub(
-		r'^(\s+)[^\d\W]\w*\s*\(.*?\)\s*\{.*?\n\1\},?',
+		r'^(\s+)[^\d\W]\w*\s*\(.*?\)\s*\{(?:\s+?|.+?\n\1)\},?',
 		'',
 		trimmed_str,
 		flags=regex.DOTALL|regex.MULTILINE|regex.UNICODE
