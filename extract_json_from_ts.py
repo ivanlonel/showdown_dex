@@ -2,10 +2,11 @@ import json
 import hjson  # https://github.com/hjson/hjson-py
 import regex
 import logging
+from typing import Any, Dict, Hashable, Iterable, Iterator, Union
 from shortest_common_supersequence import shortest_common_supersequence, longest_common_subsequence, reduce_generator
 
 
-def standardize(dicts):
+def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
 	list_of_dicts = list(dicts)
 
 	all_keys = list(reduce_generator(shortest_common_supersequence, (d.keys() for d in list_of_dicts)))
@@ -19,12 +20,12 @@ def standardize(dicts):
 		yield {**template, **dic}
 
 
-def dict_of_dicts_2_iter_of_dicts(dict_of_dicts, key_name):
+def dict_of_dicts_2_iter_of_dicts(dict_of_dicts: Dict[Hashable, dict], key_name: str) -> Iterator[dict]:
 	for k, v in dict_of_dicts.items():
 		yield{key_name: k, **v}
 
 # Maybe when pyjsparser gets extended support for ECMAScript 6 I can drop the regex in favor of a proper parser.
-def extract_json_from_ts(ts_str):
+def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list, Dict[str, Any]]:
 	trimmed_str = ''.join(ts_str.split(' = ', 1)[1:]).rsplit('}', 1)[0] + '}'
 	functionless_str = regex.sub(
 		r'^(\s+)[^\d\W]\w*\s*\(.*?\)\s*\{(?:\s+?|.+?\n\1)\},?',

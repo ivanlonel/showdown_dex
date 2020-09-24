@@ -92,6 +92,7 @@ async def main():
 			await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'learnsets.ts')
 			await queries.populate_learnsets(conn)
 
+		async with conn.transaction():
 			try:
 				await init_tmp_table(conn, path/'json'/'smogon_analyses.json', True)
 			except FileNotFoundError:
