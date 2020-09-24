@@ -5,7 +5,7 @@ INSERT INTO generation (gen_id, gen_name, games)
 	FROM tmp_smogon_gens,
 		LATERAL jsonb_array_elements(obj) WITH ORDINALITY arr(elem, pos);
 
---DROP TABLE IF EXISTS tmp_smogon_gens;
+DROP TABLE IF EXISTS tmp_smogon_gens;
 
 
 
@@ -32,7 +32,7 @@ INSERT INTO type_x_type (defending, attacking, multiplier)
 		LATERAL jsonb_each_text(obj->'damageTaken') AS ATK(type_name, value)
 	WHERE EXISTS (SELECT 1 FROM t_type T WHERE ATK.type_name = T.type_name);
 
---DROP TABLE IF EXISTS tmp_typechart;
+DROP TABLE IF EXISTS tmp_typechart;
 
 
 
@@ -70,7 +70,7 @@ INSERT INTO ability_priority
 	) AS S
 	WHERE NOT jsonb_populate_record(null::ability_priority, json_rec - 'ability_id') IS NULL;
 
---DROP TABLE IF EXISTS tmp_abilities;
+DROP TABLE IF EXISTS tmp_abilities;
 
 
 -- name: populate_abilities_text!
@@ -90,7 +90,7 @@ INSERT INTO ability_text
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys;
 
---DROP TABLE IF EXISTS tmp_abilities_text;
+DROP TABLE IF EXISTS tmp_abilities_text;
 
 
 
@@ -122,7 +122,7 @@ INSERT INTO move_flags
 	FROM tmp_moves
 	WHERE obj->'flags' @? '$.*';  -- obj->'flags' IS NOT NULL AND obj->'flags' <> '{}'::jsonb;
 
---DROP TABLE IF EXISTS tmp_moves;
+DROP TABLE IF EXISTS tmp_moves;
 
 
 -- name: populate_moves_text!
@@ -144,7 +144,7 @@ INSERT INTO t_move_text
 	WHERE obj->>'alias' <> 'magikarpsrevenge'
 	GROUP BY jsonb_with_renamed_keys;
 
---DROP TABLE IF EXISTS tmp_moves_text;
+DROP TABLE IF EXISTS tmp_moves_text;
 
 
 
@@ -220,16 +220,24 @@ INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_
 
 INSERT INTO item
 	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
-	FROM tmp_items,
-		LATERAL jsonb_each(obj - '{alias, name, num, condition, naturalGift, zMove}'::text[]) AS J(k, v),
-		LATERAL jsonb_build_object(
+	FROM tmp_items T
+		LEFT JOIN LATERAL (
+			SELECT obj->'alias' AS item_id, jsonb_object_agg(camel_to_snake_case(k), v) AS fling_data
+			FROM tmp_items,
+				LATERAL jsonb_each(obj->'fling') AS J(k, v)
+			GROUP BY obj->'alias'
+		) F
+			ON F.item_id = T.obj->'alias'
+		CROSS JOIN LATERAL jsonb_each(obj - '{alias, name, num, condition, naturalGift, zMove, fling}'::text[]) AS J(k, v)
+		CROSS JOIN LATERAL jsonb_build_object(
 			'item_id', obj->'alias',
 			'item_name', obj->'name',
 			'item_num', obj->'num',
 			'jb_condition', obj->'condition',
 			'natural_gift_base_power', obj->'naturalGift'->'basePower',
 			'natural_gift_type', obj->'naturalGift'->'type',
-			CASE obj->>'zMove' WHEN 'true' THEN 'is_generic_z_crystal' ELSE 'species_specific_z_move' END, obj->'zMove'
+			CASE obj->>'zMove' WHEN 'true' THEN 'is_generic_z_crystal' ELSE 'species_specific_z_move' END, obj->'zMove',
+			'fling', F.fling_data
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys;
 
@@ -260,7 +268,7 @@ INSERT INTO item_user (item_id, pokemon_name)
 	FROM tmp_items,
 		LATERAL jsonb_array_elements_text(obj->'itemUser');
 
---DROP TABLE IF EXISTS tmp_items;
+DROP TABLE IF EXISTS tmp_items;
 
 
 --WITH modifying_cte AS (  -- Lazy workaround to missing items
@@ -346,7 +354,7 @@ INSERT INTO pokemon_evo (pokemon_id, evo_id, evo_level, evo_type, evo_item, evo_
 		INNER JOIN pokemon P
 			ON P.pokemon_name = T.obj->>'prevo';
 
---DROP TABLE IF EXISTS tmp_pokedex;
+DROP TABLE IF EXISTS tmp_pokedex;
 
 
 -- name: populate_pokedex_text!
@@ -356,7 +364,7 @@ INSERT INTO pokemon_text (pokemon_id, pokemon_name)
 	FROM tmp_pokedex_text
 	WHERE obj->>'name' NOT LIKE '%-Gmax';
 
---DROP TABLE IF EXISTS tmp_pokedex_text;
+DROP TABLE IF EXISTS tmp_pokedex_text;
 
 
 -- name: populate_items_text!
@@ -381,7 +389,7 @@ INSERT INTO item_text
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys;
 
---DROP TABLE IF EXISTS tmp_items_text;
+DROP TABLE IF EXISTS tmp_items_text;
 
 
 -- name: populate_learnsets#
@@ -404,6 +412,11 @@ CREATE TEMPORARY TABLE tmp_events ON COMMIT DROP AS
 		LATERAL jsonb_array_elements(obj->'eventData') WITH ORDINALITY
 	WHERE --NOT
 		EXISTS(SELECT 1 FROM pokemon P WHERE obj->>'alias' = P.pokemon_id);
+	
+ANALYZE tmp_events; -- temp tables are not auto-analyzed!
+
+ALTER TABLE tmp_events ADD PRIMARY KEY (pokemon_id, event_index);
+
 
 INSERT INTO pokemon_event (pokemon_id, event_index, generation, lvl, shiny, gender, nature, ivs, perfect_ivs, is_hidden, max_egg_moves, pokeball)
 	SELECT
@@ -433,7 +446,7 @@ INSERT INTO pokemon_event_move (pokemon_id, event_index, move_id, move_slot)
 	SELECT
 		pokemon_id,
 		event_index,
-		replace(value, 'thudner', 'thunder'),  -- This is called test-driven development or whatever
+		value,
 		ordinality - 1
 	FROM tmp_events,
 		LATERAL jsonb_array_elements_text(jb_event->'moves') WITH ORDINALITY;
@@ -453,8 +466,8 @@ INSERT INTO learnset (pokemon_id, move_id, generation, source_id, event_index, l
 		AND --NOT
 			EXISTS(SELECT 1 FROM pokemon P WHERE obj->>'alias' = P.pokemon_id);
 
---DROP TABLE IF EXISTS tmp_events;
---DROP TABLE IF EXISTS tmp_learnsets;
+DROP TABLE IF EXISTS tmp_events;
+DROP TABLE IF EXISTS tmp_learnsets;
 
 
 
@@ -483,23 +496,28 @@ CREATE TEMPORARY TABLE tmp_movesets ON COMMIT DROP AS
 		CROSS JOIN LATERAL jsonb_array_elements(L1.value->'strategies') L2
 		CROSS JOIN LATERAL jsonb_array_elements(L2.value->'movesets') WITH ORDINALITY L3(jb_moveset, ordinal)
 		LEFT JOIN analysis A
-			ON (A.pokemon_id, A.gen, A.lang, A.format)
-			= (CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END, upper(L1.value->>'gen'), L1.value->>'language', L2.value->>'format');
+			ON A.pokemon_id = CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END
+			AND (A.gen, A.lang, A.format) = (upper(L1.value->>'gen'), L1.value->>'language', L2.value->>'format');
+	
+ANALYZE tmp_movesets; -- temp tables are not auto-analyzed!
 
-DROP TABLE tmp_smogon_analyses;
+ALTER TABLE tmp_movesets ADD PRIMARY KEY (analysis_id, moveset_index);
+
+DROP TABLE IF EXISTS tmp_smogon_analyses;
+
 
 INSERT INTO moveset (analysis_id, moveset_index, moveset_name, pokemon, shiny, gender, lvl, html_description)
 	SELECT
 		analysis_id,
 		moveset_index,
 		jb_moveset->>'name',
-		replace(CASE jb_moveset->>'pokemon'
+		CASE jb_moveset->>'pokemon'  -- Is this what they call "test-driven development"?
 			WHEN 'Meowstic-M' THEN 'Meowstic'
 			WHEN 'Flabebe' THEN E'Flabe\u0301be\u0301'
 			WHEN 'Necrozma-Dusk Mane' THEN 'Necrozma-Dusk-Mane'
 			WHEN 'Necrozma-Dawn Wings' THEN 'Necrozma-Dawn-Wings'
-			ELSE jb_moveset->>'pokemon'
-		END, '-Gmax', ''),
+			ELSE replace(jb_moveset->>'pokemon', '-Gmax', '')
+		END,
 		(jb_moveset->'shiny')::boolean,
 		jb_moveset->>'gender',
 		(jb_moveset->'level')::smallint,
@@ -565,6 +583,4 @@ INSERT INTO moveset_nature (analysis_id, moveset_index, nature_name)
 	FROM tmp_movesets,
 		LATERAL jsonb_array_elements_text(jb_moveset->'natures');
 		
---DROP TABLE IF EXISTS tmp_movesets;
-
-
+DROP TABLE IF EXISTS tmp_movesets;
