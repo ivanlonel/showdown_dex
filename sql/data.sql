@@ -256,8 +256,7 @@ INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_
 		LEFT JOIN pokemon_forme PF
 			ON PF.pokemon_name = replace(TP.obj->>'name', E'\u2019', '''')
 		LEFT JOIN t_move AS M
-			ON TP.obj->>'canGigantamax' = M.move_name
-	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax';
+			ON TP.obj->>'canGigantamax' = M.move_name;
 
 INSERT INTO item
 	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys || CASE
@@ -372,15 +371,13 @@ INSERT INTO pokemon_forme_battle_only (species_num, forme_index, battle_only)
 INSERT INTO pokemon_egg_group (pokemon_id, egg_group)
 	SELECT obj->>'alias', value::enum_egg_group
 	FROM tmp_pokedex,
-		LATERAL jsonb_array_elements_text(obj->'eggGroups')
-	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax';
+		LATERAL jsonb_array_elements_text(obj->'eggGroups');
 
 INSERT INTO pokemon_type (pokemon_id, is_secondary, type_name)
 	SELECT obj->>'alias', (ordinality = 2), value
 	FROM tmp_pokedex,
 		LATERAL jsonb_array_elements_text(obj->'types') WITH ORDINALITY
-	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax'
-		AND obj->>'alias' <> 'missingno'; -- missingno's type is Bird
+	WHERE obj->>'alias' <> 'missingno'; -- missingno's type is Bird
 
 INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_id)
 	SELECT obj->>'alias', L.key::enum_ability_slot, A.ability_id
@@ -388,8 +385,7 @@ INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_id)
 		CROSS JOIN LATERAL jsonb_each_text(obj->'abilities') AS L
 		LEFT JOIN ability AS A
 			ON L.value = A.ability_name
-	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax'
-		AND obj->>'alias' <> 'missingno';  -- missingno's ability is an empty string
+	WHERE obj->>'alias' <> 'missingno';  -- missingno's ability is an empty string
 
 --WITH modifying_cte AS (  -- Lazy workaround to missing items
 --	INSERT INTO item (item_id, item_name)
@@ -422,8 +418,7 @@ DROP TABLE IF EXISTS tmp_pokedex;
 -- Populate table pokemon_text.
 INSERT INTO pokemon_text (pokemon_id, pokemon_name)
 	SELECT obj->>'alias', obj->>'name'
-	FROM tmp_pokedex_text
-	WHERE obj->>'name' NOT LIKE '%-Gmax';
+	FROM tmp_pokedex_text;
 
 DROP TABLE IF EXISTS tmp_pokedex_text;
 
@@ -588,7 +583,7 @@ INSERT INTO moveset (analysis_id, moveset_index, moveset_name, pokemon, shiny, g
 				WHEN 'Flabebe' THEN E'Flabe\u0301be\u0301'
 				WHEN 'Necrozma-Dusk Mane' THEN 'Necrozma-Dusk-Mane'
 				WHEN 'Necrozma-Dawn Wings' THEN 'Necrozma-Dawn-Wings'
-				ELSE replace(jb_moveset->>'pokemon', '-Gmax', '')
+				ELSE jb_moveset->>'pokemon'
 			END;
 
 INSERT INTO moveset_ability (analysis_id, moveset_index, ability_id)
