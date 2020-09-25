@@ -55,6 +55,7 @@ async def main():
 
 		async with conn.transaction():
 			await queries.create_schema(conn)
+			await queries.populate_nature(conn)
 
 		async with conn.transaction():
 			try:
