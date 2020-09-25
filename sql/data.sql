@@ -1,5 +1,37 @@
+-- name: populate_nature!
+-- Populate table "nature" with hardcoded data.
+INSERT INTO nature VALUES
+	('Hardy'  , 'Atk', 'Atk'),
+	('Bold'   , 'Atk', 'Def'),
+	('Modest' , 'Atk', 'SpA'),
+	('Calm'   , 'Atk', 'SpD'),
+	('Timid'  , 'Atk', 'Spe'),
+	('Lonely' , 'Def', 'Atk'),
+	('Docile' , 'Def', 'Def'),
+	('Mild'   , 'Def', 'SpA'),
+	('Gentle' , 'Def', 'SpD'),
+	('Hasty'  , 'Def', 'Spe'),
+	('Adamant', 'SpA', 'Atk'),
+	('Impish' , 'SpA', 'Def'),
+	('Bashful', 'SpA', 'SpA'),
+	('Careful', 'SpA', 'SpD'),
+	('Jolly'  , 'SpA', 'Spe'),
+	('Naughty', 'SpD', 'Atk'),
+	('Lax'    , 'SpD', 'Def'),
+	('Rash'   , 'SpD', 'SpA'),
+	('Quirky' , 'SpD', 'SpD'),
+	('Naive'  , 'SpD', 'Spe'),
+	('Brave'  , 'Spe', 'Atk'),
+	('Relaxed', 'Spe', 'Def'),
+	('Quiet'  , 'Spe', 'SpA'),
+	('Sassy'  , 'Spe', 'SpD'),
+	('Serious', 'Spe', 'Spe')
+ON CONFLICT DO NOTHING;
+
+
+
 -- name: populate_generation!
--- Exoects all elements in a single jsonb object.
+-- Expects all elements in a single jsonb object.
 INSERT INTO generation (gen_id, gen_name, games)
 	SELECT pos, elem->>'shorthand', string_to_array(elem->>'name', '/')
 	FROM tmp_smogon_gens,
@@ -225,7 +257,7 @@ INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_
 			ON PF.pokemon_name = replace(TP.obj->>'name', E'\u2019', '''')
 		LEFT JOIN t_move AS M
 			ON TP.obj->>'canGigantamax' = M.move_name
-	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax';
+	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax';
 
 INSERT INTO item
 	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys || CASE
@@ -341,13 +373,13 @@ INSERT INTO pokemon_egg_group (pokemon_id, egg_group)
 	SELECT obj->>'alias', value::enum_egg_group
 	FROM tmp_pokedex,
 		LATERAL jsonb_array_elements_text(obj->'eggGroups')
-	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax';
+	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax';
 
 INSERT INTO pokemon_type (pokemon_id, is_secondary, type_name)
 	SELECT obj->>'alias', (ordinality = 2), value
 	FROM tmp_pokedex,
 		LATERAL jsonb_array_elements_text(obj->'types') WITH ORDINALITY
-	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax'
+	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax'
 		AND obj->>'alias' <> 'missingno'; -- missingno's type is Bird
 
 INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_id)
@@ -356,7 +388,7 @@ INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_id)
 		CROSS JOIN LATERAL jsonb_each_text(obj->'abilities') AS L
 		LEFT JOIN ability AS A
 			ON L.value = A.ability_name
-	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax'
+	WHERE right(obj->>'forme', 4) IS DISTINCT FROM 'Gmax'
 		AND obj->>'alias' <> 'missingno';  -- missingno's ability is an empty string
 
 --WITH modifying_cte AS (  -- Lazy workaround to missing items
@@ -505,15 +537,17 @@ DROP TABLE IF EXISTS tmp_learnsets;
 INSERT INTO analysis (pokemon_id, gen, lang, format, html_overview, html_comments, credits)
 	SELECT
 		CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END,
-		upper(L1.value->>'gen'),
+		G.gen_id,
 		L1.value->>'language',
 		L2.value->>'format',
 		L2.value->>'overview',
 		L2.value->>'comments',
 		L2.value->'credits'
-	FROM tmp_smogon_analyses,
-		LATERAL jsonb_array_elements(obj) L1,
-		LATERAL jsonb_array_elements(L1.value->'strategies') L2;
+	FROM tmp_smogon_analyses
+		CROSS JOIN LATERAL jsonb_array_elements(obj) L1
+		CROSS JOIN LATERAL jsonb_array_elements(L1.value->'strategies') L2
+		LEFT JOIN generation G
+			ON upper(L1.value->>'gen') = G.gen_name;
 
 CREATE TEMPORARY TABLE tmp_movesets ON COMMIT DROP AS
 	SELECT
@@ -524,9 +558,11 @@ CREATE TEMPORARY TABLE tmp_movesets ON COMMIT DROP AS
 		CROSS JOIN LATERAL jsonb_array_elements(obj) L1
 		CROSS JOIN LATERAL jsonb_array_elements(L1.value->'strategies') L2
 		CROSS JOIN LATERAL jsonb_array_elements(L2.value->'movesets') WITH ORDINALITY L3(jb_moveset, ordinal)
+		LEFT JOIN generation G
+			ON upper(L1.value->>'gen') = G.gen_name
 		LEFT JOIN analysis A
 			ON A.pokemon_id = CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END
-			AND (A.gen, A.lang, A.format) = (upper(L1.value->>'gen'), L1.value->>'language', L2.value->>'format');
+			AND (A.gen, A.lang, A.format) = (G.gen_id, L1.value->>'language', L2.value->>'format');
 	
 ANALYZE tmp_movesets; -- temp tables are not auto-analyzed!
 
@@ -540,26 +576,30 @@ INSERT INTO moveset (analysis_id, moveset_index, moveset_name, pokemon, shiny, g
 		analysis_id,
 		moveset_index,
 		jb_moveset->>'name',
-		CASE jb_moveset->>'pokemon'  -- Is this what they call "test-driven development"?
-			WHEN 'Meowstic-M' THEN 'Meowstic'
-			WHEN 'Flabebe' THEN E'Flabe\u0301be\u0301'
-			WHEN 'Necrozma-Dusk Mane' THEN 'Necrozma-Dusk-Mane'
-			WHEN 'Necrozma-Dawn Wings' THEN 'Necrozma-Dawn-Wings'
-			ELSE replace(jb_moveset->>'pokemon', '-Gmax', '')
-		END,
+		P.pokemon_id,
 		(jb_moveset->'shiny')::boolean,
 		jb_moveset->>'gender',
 		(jb_moveset->'level')::smallint,
 		jb_moveset->>'description'
-	FROM tmp_movesets;
+	FROM tmp_movesets
+		LEFT JOIN pokemon P
+			ON P.pokemon_name = CASE jb_moveset->>'pokemon'  -- Is this what they call "test-driven development"?
+				WHEN 'Meowstic-M' THEN 'Meowstic'
+				WHEN 'Flabebe' THEN E'Flabe\u0301be\u0301'
+				WHEN 'Necrozma-Dusk Mane' THEN 'Necrozma-Dusk-Mane'
+				WHEN 'Necrozma-Dawn Wings' THEN 'Necrozma-Dawn-Wings'
+				ELSE replace(jb_moveset->>'pokemon', '-Gmax', '')
+			END;
 
-INSERT INTO moveset_ability (analysis_id, moveset_index, ability_name)
+INSERT INTO moveset_ability (analysis_id, moveset_index, ability_id)
 	SELECT
 		analysis_id,
 		moveset_index,
-		value
-	FROM tmp_movesets,
-		LATERAL jsonb_array_elements_text(jb_moveset->'abilities');
+		A.ability_id
+	FROM tmp_movesets
+		CROSS JOIN LATERAL jsonb_array_elements_text(jb_moveset->'abilities') L
+		LEFT JOIN ability A
+			ON L.value = A.ability_name;
 
 --WITH modifying_cte AS (  -- Lazy workaround to missing items
 --	INSERT INTO item (item_id, item_name)
@@ -569,24 +609,28 @@ INSERT INTO moveset_ability (analysis_id, moveset_index, ability_name)
 --		WHERE value <> 'No Item'
 --			AND NOT EXISTS(SELECT 1 FROM item I WHERE value = I.item_name)
 --)
-INSERT INTO moveset_item (analysis_id, moveset_index, item_name)
+INSERT INTO moveset_item (analysis_id, moveset_index, item_id)
 	SELECT
 		analysis_id,
 		moveset_index,
-		value
-	FROM tmp_movesets,
-		LATERAL jsonb_array_elements_text(jb_moveset->'items')
+		I.item_id
+	FROM tmp_movesets
+		CROSS JOIN LATERAL jsonb_array_elements_text(jb_moveset->'items') L
+		LEFT JOIN item I
+			ON L.value = I.item_name
 	WHERE value <> 'No Item';
 
-INSERT INTO moveset_move (analysis_id, moveset_index, slot, move_name)
+INSERT INTO moveset_move (analysis_id, moveset_index, slot, move_id)
 	SELECT DISTINCT  -- Distinct because Hidden Power
 		analysis_id,
 		moveset_index,
-		l4.ordinality - 1,
-		L5.value->>'move'
-	FROM tmp_movesets,
-		LATERAL jsonb_array_elements(jb_moveset->'moveslots') WITH ORDINALITY L4,
-		LATERAL jsonb_array_elements(L4.value) L5;
+		L1.ordinality - 1,
+		M.move_id
+	FROM tmp_movesets
+		CROSS JOIN LATERAL jsonb_array_elements(jb_moveset->'moveslots') WITH ORDINALITY L1
+		CROSS JOIN LATERAL jsonb_array_elements(L1.value) L2
+		LEFT JOIN t_move M
+			ON L2.value->>'move' = M.move_name;
 
 INSERT INTO moveset_evconfig (analysis_id, moveset_index, evconfig)
 	SELECT
