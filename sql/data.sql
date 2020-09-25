@@ -97,9 +97,12 @@ DROP TABLE IF EXISTS tmp_abilities_text;
 -- name: populate_moves#
 -- Populate tables t_move and move_flags.
 INSERT INTO t_move
-	SELECT (jsonb_populate_record(null::t_move, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
+	SELECT (jsonb_populate_record(null::t_move, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys || CASE
+			WHEN jsonb_typeof(obj->'isMax') = 'boolean' THEN jsonb_build_object('is_max', obj->'isMax')
+			ELSE jsonb_build_object('is_gmax', to_id(obj->>'isMax'))
+		END)).*
 	FROM tmp_moves,
-		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, realMove, isMax, isGmax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, realMove, isMax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'move_id', obj->'alias',
 			'move_name', obj->'name',
@@ -108,8 +111,6 @@ INSERT INTO t_move
 			CASE obj->>'accuracy' WHEN 'true' THEN 'always_hit' ELSE 'accuracy' END, obj->'accuracy',
 			'type_name', obj->'type',
 			'real_move', to_id(obj->>'realMove'),
-			CASE obj->>'isMax' WHEN 'true' THEN 'is_max' ELSE 'is_gmax' END, obj->'isMax',
-			'is_gmax', to_id(obj->>'isGmax'),
 			'heal', (obj->'heal'->0)::numeric / (obj->'heal'->1)::numeric,
 			'recoil', (obj->'recoil'->0)::numeric / (obj->'recoil'->1)::numeric,
 			'drain', (obj->'drain'->0)::numeric / (obj->'drain'->1)::numeric,
@@ -117,7 +118,7 @@ INSERT INTO t_move
 			'multihit_min', CASE WHEN jsonb_typeof(obj->'multihit') = 'array' THEN obj->'multihit'->0 ELSE obj->'multihit' END,
 			'multihit_max', CASE WHEN jsonb_typeof(obj->'multihit') = 'array' THEN obj->'multihit'->1 ELSE obj->'multihit' END
 		) AS jsonb_with_renamed_keys
-	GROUP BY jsonb_with_renamed_keys;
+	GROUP BY jsonb_with_renamed_keys, obj;
 
 INSERT INTO move_flags 
 	SELECT (jsonb_populate_record(null::move_flags, jsonb_set(obj->'flags', '{move_id}', obj->'alias'))).*
@@ -322,7 +323,6 @@ INSERT INTO pokemon_forme_required_item (species_num, forme_index, required_item
 	) S
 		INNER JOIN item AS I
 			ON S.required_item = I.item_name;
-	--WHERE S.required_item IS NOT NULL;
 
 INSERT INTO pokemon_forme_battle_only (species_num, forme_index, battle_only)
 	SELECT
