@@ -99,7 +99,7 @@ DROP TABLE IF EXISTS tmp_abilities_text;
 INSERT INTO t_move
 	SELECT (jsonb_populate_record(null::t_move, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
 	FROM tmp_moves,
-		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, isMax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, realMove, isMax, isGmax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'move_id', obj->'alias',
 			'move_name', obj->'name',
@@ -107,7 +107,9 @@ INSERT INTO t_move
 			'jb_condition', obj->'condition',
 			CASE obj->>'accuracy' WHEN 'true' THEN 'always_hit' ELSE 'accuracy' END, obj->'accuracy',
 			'type_name', obj->'type',
+			'real_move', to_id(obj->>'realMove'),
 			CASE obj->>'isMax' WHEN 'true' THEN 'is_max' ELSE 'is_gmax' END, obj->'isMax',
+			'is_gmax', to_id(obj->>'isGmax'),
 			'heal', (obj->'heal'->0)::numeric / (obj->'heal'->1)::numeric,
 			'recoil', (obj->'recoil'->0)::numeric / (obj->'recoil'->1)::numeric,
 			'drain', (obj->'drain'->0)::numeric / (obj->'drain'->1)::numeric,
@@ -153,7 +155,7 @@ DROP TABLE IF EXISTS tmp_moves_text;
 INSERT INTO base_species(species_num, species_name)
 	SELECT
 		(obj->'num')::smallint,
-		replace(obj->>'name' ,E'\u2019' ,'''')  -- Farfetch’d > Farfetch'd
+		replace(obj->>'name', E'\u2019', '''')  -- Farfetch’d > Farfetch'd
 	FROM tmp_pokedex
 	WHERE obj->'forme' IS NULL;
 
@@ -162,11 +164,11 @@ INSERT INTO pokemon_forme (species_num, forme_index, forme_name, pokemon_name, i
 		species_num,
 		forme_index,
 		COALESCE(obj->>'forme', obj->>'baseForme', SUBSTRING(pokemon_name FROM base_forme || '-(.+)')),
-		replace(pokemon_name ,E'\u2019' ,''''),  -- Farfetch’d > Farfetch'd
+		replace(pokemon_name, E'\u2019', ''''),  -- Farfetch’d > Farfetch'd
 		obj IS NULL OR obj->'cosmeticFormes' IS NOT NULL AND obj->'cosmeticFormes' ? pokemon_name,
 		obj->'formeOrder' IS NOT NULL,
-		obj->>'requiredAbility',
-		obj->>'requiredMove',
+		A.ability_id,
+		M.move_id,
 		obj->'battleOnly' IS NOT NULL,
 		obj->>'changesFrom'
 	FROM (
@@ -188,14 +190,18 @@ INSERT INTO pokemon_forme (species_num, forme_index, forme_name, pokemon_name, i
 		WHERE array_length(D.list, 1) > 1  -- bye bye, Rockruff!
 	) AS all_formes
 		LEFT JOIN tmp_pokedex AS TP
-			ON all_formes.pokemon_name = TP.obj->>'name';
+			ON all_formes.pokemon_name = TP.obj->>'name'
+		LEFT JOIN ability AS A
+			ON TP.obj->>'requiredAbility' = A.ability_name
+		LEFT JOIN t_move AS M
+			ON TP.obj->>'requiredMove' = M.move_name;
 
 INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_ratio, base_stats, heightm, weightkg, color, can_hatch, can_gigantamax, cannot_dynamax, gen, unreleased_hidden, max_hp)
 	SELECT
 		obj->>'alias',
 		(obj->'num')::smallint,
 		PF.forme_index,
-		replace(obj->>'name' ,E'\u2019' ,''''),  -- Farfetch’d > Farfetch'd
+		replace(obj->>'name', E'\u2019', ''''),  -- Farfetch’d > Farfetch'd
 		CASE
 			WHEN obj->>'gender' = 'F' THEN 1
 			WHEN obj->>'gender' = 'M' THEN 0
@@ -208,18 +214,23 @@ INSERT INTO pokemon (pokemon_id, species_num, forme_index, pokemon_name, female_
 		(obj->'weightkg')::smallint,
 		(obj->>'color')::enum_color,
 		(obj->'canHatch')::boolean,
-		obj->>'canGigantamax',
+		M.move_id,
 		(obj->'cannotDynamax')::boolean,
 		(obj->'gen')::smallint,
 		(obj->>'unreleasedHidden')::enum_unreleased,
 		(obj->'maxHP')::smallint
 	FROM tmp_pokedex TP
 		LEFT JOIN pokemon_forme PF
-			ON PF.pokemon_name = replace(TP.obj->>'name' ,E'\u2019' ,'''')
+			ON PF.pokemon_name = replace(TP.obj->>'name', E'\u2019', '''')
+		LEFT JOIN t_move AS M
+			ON TP.obj->>'canGigantamax' = M.move_name
 	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax';
 
 INSERT INTO item
-	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys)).*
+	SELECT (jsonb_populate_record(null::item, jsonb_object_agg(camel_to_snake_case(k), v) || jsonb_with_renamed_keys || CASE
+			WHEN jsonb_typeof(T.obj->'zMove') = 'boolean' THEN jsonb_build_object('is_generic_z_crystal', T.obj->'zMove')
+			ELSE jsonb_build_object('species_specific_z_move', MZM.move_id)
+		END)).*
 	FROM tmp_items T
 		LEFT JOIN LATERAL (
 			SELECT obj->'alias' AS item_id, jsonb_object_agg(camel_to_snake_case(k), v) AS fling_data
@@ -228,7 +239,17 @@ INSERT INTO item
 			GROUP BY obj->'alias'
 		) F
 			ON F.item_id = T.obj->'alias'
-		CROSS JOIN LATERAL jsonb_each(obj - '{alias, name, num, condition, naturalGift, zMove, fling}'::text[]) AS J(k, v)
+		LEFT JOIN pokemon AS PMS
+			ON T.obj->>'megaStone' = PMS.pokemon_name
+		LEFT JOIN pokemon AS PME
+			ON T.obj->>'megaEvolves' = PME.pokemon_name
+		LEFT JOIN t_move AS MZM
+			ON T.obj->>'zMove' = MZM.move_name
+		LEFT JOIN t_move AS MZF
+			ON T.obj->>'zMoveFrom' = MZF.move_name
+		LEFT JOIN pokemon AS PFM
+			ON T.obj->>'forcedForme' = PFM.pokemon_name
+		CROSS JOIN LATERAL jsonb_each(obj - '{alias, name, num, condition, naturalGift, megaStone, megaEvolves, zMove, zMoveFrom, forcedForme, fling}'::text[]) AS J(k, v)
 		CROSS JOIN LATERAL jsonb_build_object(
 			'item_id', obj->'alias',
 			'item_name', obj->'name',
@@ -236,10 +257,13 @@ INSERT INTO item
 			'jb_condition', obj->'condition',
 			'natural_gift_base_power', obj->'naturalGift'->'basePower',
 			'natural_gift_type', obj->'naturalGift'->'type',
-			CASE obj->>'zMove' WHEN 'true' THEN 'is_generic_z_crystal' ELSE 'species_specific_z_move' END, obj->'zMove',
+			'mega_stone', PMS.pokemon_id,
+			'mega_evolves', PME.pokemon_id,
+			'z_move_from', MZF.move_id,
+			'forced_forme', PFM.pokemon_id,
 			'fling', F.fling_data
 		) AS jsonb_with_renamed_keys
-	GROUP BY jsonb_with_renamed_keys;
+	GROUP BY jsonb_with_renamed_keys, T.obj, MZM.move_id;
 
 INSERT INTO item_priority
 	SELECT (jsonb_populate_record(null::item_priority, json_rec)).*
@@ -261,12 +285,12 @@ INSERT INTO item_priority
 	) AS S
 	WHERE NOT jsonb_populate_record(null::item_priority, json_rec - 'item_id') IS NULL;
 
-INSERT INTO item_user (item_id, pokemon_name)
-	SELECT
-		obj->>'alias',
-		replace(value ,E'\u2019' ,'''')  -- Farfetch’d > Farfetch'd
-	FROM tmp_items,
-		LATERAL jsonb_array_elements_text(obj->'itemUser');
+INSERT INTO item_user (item_id, pokemon_id)
+	SELECT obj->>'alias', P.pokemon_id
+	FROM tmp_items
+		CROSS JOIN LATERAL jsonb_array_elements_text(obj->'itemUser')
+		LEFT JOIN pokemon AS P
+			ON replace(value, E'\u2019', '''') = P.pokemon_name;
 
 DROP TABLE IF EXISTS tmp_items;
 
@@ -283,36 +307,35 @@ DROP TABLE IF EXISTS tmp_items;
 --		WHERE required_item_name IS NOT NULL
 --			AND NOT EXISTS (SELECT 1 FROM item I WHERE S.required_item_name = I.item_name)
 --)
-INSERT INTO pokemon_forme_required_item (species_num, forme_index, required_item_name)
-	SELECT *
+INSERT INTO pokemon_forme_required_item (species_num, forme_index, required_item)
+	SELECT S.species_num, S.forme_index, I.item_id
 	FROM (
 		SELECT
 			PF.species_num,
 			PF.forme_index,
-			COALESCE(TP.obj->>'requiredItem', value) AS required_item_name
+			COALESCE(TP.obj->>'requiredItem', value) AS required_item
 		FROM pokemon_forme PF
 			LEFT JOIN tmp_pokedex TP
 				ON PF.pokemon_name = TP.obj->>'name'
 			LEFT JOIN LATERAL jsonb_array_elements_text(TP.obj->'requiredItems')
 				ON TRUE
 	) S
-	WHERE required_item_name IS NOT NULL;
+		INNER JOIN item AS I
+			ON S.required_item = I.item_name;
+	--WHERE S.required_item IS NOT NULL;
 
-INSERT INTO pokemon_forme_battle_only (species_num, forme_index, battle_only_name)
+INSERT INTO pokemon_forme_battle_only (species_num, forme_index, battle_only)
 	SELECT
-		PF.species_num, PF.forme_index, replace(obj->>'battleOnly' ,E'\u2019' ,'''')
+		PF.species_num, PF.forme_index, P.pokemon_id
 	FROM pokemon_forme PF
 		LEFT JOIN tmp_pokedex TP
-			ON PF.pokemon_name = replace(TP.obj->>'name' ,E'\u2019' ,'''')
-	WHERE jsonb_typeof(TP.obj->'battleOnly') = 'string'
-UNION ALL
-	SELECT
-		PF.species_num, PF.forme_index, replace(value ,E'\u2019' ,'''')
-	FROM pokemon_forme PF
-		LEFT JOIN tmp_pokedex TP
-			ON PF.pokemon_name = replace(TP.obj->>'name' ,E'\u2019' ,'''')
-		CROSS JOIN LATERAL jsonb_array_elements_text(TP.obj->'battleOnly')
-	WHERE jsonb_typeof(TP.obj->'battleOnly') = 'array';
+			ON PF.pokemon_name = replace(TP.obj->>'name', E'\u2019', '''')
+		CROSS JOIN LATERAL jsonb_array_elements_text(CASE
+			WHEN jsonb_typeof(TP.obj->'battleOnly') = 'array' THEN TP.obj->'battleOnly'
+			ELSE jsonb_build_array(TP.obj->'battleOnly')
+		END) AS L
+		INNER JOIN pokemon AS P
+			ON replace(L.value, E'\u2019', '''') = P.pokemon_name;
 
 INSERT INTO pokemon_egg_group (pokemon_id, egg_group)
 	SELECT obj->>'alias', value::enum_egg_group
@@ -327,10 +350,12 @@ INSERT INTO pokemon_type (pokemon_id, is_secondary, type_name)
 	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax'
 		AND obj->>'alias' <> 'missingno'; -- missingno's type is Bird
 
-INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_name)
-	SELECT obj->>'alias', key::enum_ability_slot, value
-	FROM tmp_pokedex,
-		LATERAL jsonb_each_text(obj->'abilities')
+INSERT INTO pokemon_ability (pokemon_id, ability_slot, ability_id)
+	SELECT obj->>'alias', L.key::enum_ability_slot, A.ability_id
+	FROM tmp_pokedex
+		CROSS JOIN LATERAL jsonb_each_text(obj->'abilities') AS L
+		LEFT JOIN ability AS A
+			ON L.value = A.ability_name
 	WHERE lower(obj->>'forme') IS DISTINCT FROM 'gmax'
 		AND obj->>'alias' <> 'missingno';  -- missingno's ability is an empty string
 
@@ -347,12 +372,16 @@ INSERT INTO pokemon_evo (pokemon_id, evo_id, evo_level, evo_type, evo_item, evo_
 		obj->>'alias',
 		(obj->'evoLevel')::smallint,
 		(obj->>'evoType')::enum_evo_type,
-		obj->>'evoItem',
-		obj->>'evoMove',
+		I.item_id,
+		M.move_id,
 		obj->>'evoCondition'
 	FROM tmp_pokedex T
 		INNER JOIN pokemon P
-			ON P.pokemon_name = T.obj->>'prevo';
+			ON T.obj->>'prevo' = P.pokemon_name
+		LEFT JOIN item AS I
+			ON T.obj->>'evoItem' = I.item_name
+		LEFT JOIN t_move AS M
+			ON T.obj->>'evoMove' = M.move_name;
 
 DROP TABLE IF EXISTS tmp_pokedex;
 

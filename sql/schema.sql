@@ -340,14 +340,14 @@ CREATE TABLE IF NOT EXISTS t_move (
 	type_name text NOT NULL REFERENCES t_type,
 	priority smallint NOT NULL,
 	target enum_move_targets NOT NULL,
-	real_move text REFERENCES t_move (move_name),  -- Hidden Power
+	real_move text REFERENCES t_move,  -- Hidden Power
 	damage text,  -- number | 'level' | false | null
 	contest_type enum_contest,
 	no_pp_boosts boolean,
 	is_z text,  -- REFERENCES item (item_id) DEFERRABLE INITIALLY DEFERRED,
 	z_move jsonb,
 	is_max boolean CHECK (is_max IS NULL OR is_gmax IS NULL), 
-	is_gmax text,  -- REFERENCES pokemon (pokemon_name) DEFERRABLE INITIALLY DEFERRED,
+	is_gmax text,  -- REFERENCES pokemon (pokemon_id) DEFERRABLE INITIALLY DEFERRED,
 	max_move_base_power smallint,
 	ohko text,
 	thaws_target boolean,
@@ -522,8 +522,8 @@ CREATE TABLE IF NOT EXISTS pokemon_forme (
 	pokemon_name text UNIQUE NOT NULL,  -- The original "name" field of the pokemon with this form OR the name that appears inside "cosmeticFormes"
 	is_cosmetic boolean NOT NULL,
 	is_base_forme boolean NOT NULL,  -- Not redundant. Minior's base forme's forme_index is 1 instead of 0.
-    required_ability text REFERENCES ability (ability_name),  -- use ability_id instead?
-    required_move text REFERENCES t_move (move_name),  -- use move_id instead?
+    required_ability text REFERENCES ability (ability_id),
+    required_move text REFERENCES t_move (move_id),
     is_battle_only boolean NOT NULL,  -- Originally either a string or an array (see Zygarde-Complete and Necrozma-Ultra). See table "pokemon_forme_battle_only".
     changes_from text REFERENCES pokemon_forme (pokemon_name),  -- Currently only differs from baseSpecies when dealing with Pikachu-Cosplay.
 	PRIMARY KEY (species_num, forme_index)
@@ -559,7 +559,7 @@ CREATE TABLE IF NOT EXISTS pokemon (
     weightkg numeric NOT NULL,
     color enum_color NOT NULL,
     can_hatch boolean,
-    can_gigantamax text REFERENCES t_move (move_name),  -- use move_id instead?
+    can_gigantamax text REFERENCES t_move (move_id),
     cannot_dynamax boolean,
     gen smallint REFERENCES generation (gen_id),
     unreleased_hidden enum_unreleased,  -- can be either 'false', 'true' or 'Past'.
@@ -579,16 +579,16 @@ CREATE TABLE IF NOT EXISTS item (
 	jb_condition jsonb,  -- not worth it.
 	natural_gift_base_power smallint CHECK ((natural_gift_base_power IS NULL) = (natural_gift_type IS NULL)),
 	natural_gift_type text REFERENCES t_type (type_name),
-	mega_stone text REFERENCES pokemon (pokemon_name),  -- use pokemon_id instead?
-	mega_evolves text REFERENCES pokemon (pokemon_name),  -- use pokemon_id instead?
+	mega_stone text REFERENCES pokemon (pokemon_id),
+	mega_evolves text REFERENCES pokemon (pokemon_id),
 
 	-- The two keys below are split from the "zMove" property in the original data source.
 	is_generic_z_crystal boolean,  -- This is probably redundant, as z_move_type should be NOT NULL if and only if this is true.
-	species_specific_z_move text REFERENCES t_move (move_name),  -- use id instead?
+	species_specific_z_move text REFERENCES t_move (move_id),
 
 	z_move_type text REFERENCES t_type (type_name),
-	z_move_from text REFERENCES t_move (move_name),  -- use move_id instead?
-	forced_forme text REFERENCES pokemon (pokemon_name),  -- use pokemon_id instead?
+	z_move_from text REFERENCES t_move (move_id),
+	forced_forme text REFERENCES pokemon (pokemon_id),
 	ignore_klutz boolean,
 	is_berry boolean,
 	is_choice boolean,
@@ -606,12 +606,12 @@ CREATE TABLE IF NOT EXISTS item (
 
 ALTER TABLE t_move
 	ADD FOREIGN KEY (is_z) REFERENCES item DEFERRABLE INITIALLY DEFERRED,
-	ADD FOREIGN KEY (is_gmax) REFERENCES pokemon (pokemon_name) DEFERRABLE INITIALLY DEFERRED;  -- use pokemon_id instead?
+	ADD FOREIGN KEY (is_gmax) REFERENCES pokemon DEFERRABLE INITIALLY DEFERRED;  -- use pokemon_id instead?
 
 CREATE TABLE IF NOT EXISTS item_user (
 	item_id text REFERENCES item,
-	pokemon_name text REFERENCES pokemon (pokemon_name),  -- use pokemon_id instead?
-	PRIMARY KEY (item_id, pokemon_name)
+	pokemon_id text REFERENCES pokemon,
+	PRIMARY KEY (item_id, pokemon_id)
 );
 
 CREATE TABLE IF NOT EXISTS item_priority (
@@ -676,16 +676,16 @@ CREATE TABLE IF NOT EXISTS item_priority (
 CREATE TABLE IF NOT EXISTS pokemon_forme_required_item (
 	species_num smallint,
 	forme_index smallint,
-	required_item_name text REFERENCES item (item_name),  -- use item_id instead?
-	PRIMARY KEY (species_num, forme_index, required_item_name),
+	required_item text REFERENCES item (item_id),
+	PRIMARY KEY (species_num, forme_index, required_item),
 	FOREIGN KEY (species_num, forme_index) REFERENCES pokemon_forme
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_forme_battle_only (
 	species_num smallint,
 	forme_index smallint,
-	battle_only_name text REFERENCES pokemon (pokemon_name),  -- use pokemon_id instead?
-	PRIMARY KEY (species_num, forme_index, battle_only_name),
+	battle_only text REFERENCES pokemon (pokemon_id),
+	PRIMARY KEY (species_num, forme_index, battle_only),
 	FOREIGN KEY (species_num, forme_index) REFERENCES pokemon_forme
 );
 
@@ -706,9 +706,9 @@ CREATE TABLE IF NOT EXISTS pokemon_type (
 CREATE TABLE IF NOT EXISTS pokemon_ability (
 	pokemon_id text REFERENCES pokemon,
 	ability_slot enum_ability_slot,
-	ability_name text NOT NULL REFERENCES ability (ability_name),  -- use ability_id instead?
+	ability_id text NOT NULL REFERENCES ability,
 	PRIMARY KEY (pokemon_id, ability_slot),
-	UNIQUE (ability_name, pokemon_id)
+	UNIQUE (ability_id, pokemon_id)
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_evo (
@@ -716,8 +716,8 @@ CREATE TABLE IF NOT EXISTS pokemon_evo (
 	evo_id text PRIMARY KEY REFERENCES pokemon (pokemon_id),
 	evo_level smallint,
     evo_type enum_evo_type,
-    evo_item text REFERENCES item (item_name),  -- use item_id instead?
-    evo_move text REFERENCES t_move (move_name),  -- use move_id instead?
+    evo_item text REFERENCES item (item_id),
+    evo_move text REFERENCES t_move (move_id),
     evo_condition text
 );
 
