@@ -120,6 +120,7 @@ INSERT INTO ability_text
 			'move_txt', obj->'move',
 			'transform_txt',  obj->'transform'
 		) AS jsonb_with_renamed_keys
+	WHERE obj->>'alias' <> 'asone'  -- Table ability has asoneglastrier and asonespectrier, but not the generic one.
 	GROUP BY jsonb_with_renamed_keys;
 
 DROP TABLE IF EXISTS tmp_abilities_text;
@@ -134,7 +135,7 @@ INSERT INTO t_move
 			ELSE jsonb_build_object('is_gmax', to_id(obj->>'isMax'))
 		END)).*
 	FROM tmp_moves,
-		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, realMove, isMax, heal, recoil, drain, secondary, secondaries, multihit, flags}'::text[]) AS J(k, v),
+		LATERAL jsonb_each(obj - '{alias, name, num, condition, accuracy, type, realMove, maxMove, isMax, heal, selfBoost, boosts, recoil, drain, secondary, secondaries, self, multihit, flags}'::text[]) AS J(k, v),
 		LATERAL jsonb_build_object(
 			'move_id', obj->'alias',
 			'move_name', obj->'name',
@@ -144,11 +145,39 @@ INSERT INTO t_move
 			'type_name', obj->'type',
 			'real_move', to_id(obj->>'realMove'),
 			'heal', (obj->'heal'->0)::numeric / (obj->'heal'->1)::numeric,
+			'self_boost', jsonb_populate_record(NULL::type_boosts, obj->'selfBoost'),
+			'boosts', jsonb_populate_record(NULL::type_boosts, obj->'boosts'),
 			'recoil', (obj->'recoil'->0)::numeric / (obj->'recoil'->1)::numeric,
 			'drain', (obj->'drain'->0)::numeric / (obj->'drain'->1)::numeric,
 			'secondary_on_hit', COALESCE(obj->'secondary', obj->'secondaries'),
+			'self_on_hit', obj->'self',
 			'multihit_min', CASE WHEN jsonb_typeof(obj->'multihit') = 'array' THEN obj->'multihit'->0 ELSE obj->'multihit' END,
-			'multihit_max', CASE WHEN jsonb_typeof(obj->'multihit') = 'array' THEN obj->'multihit'->1 ELSE obj->'multihit' END
+			'multihit_max', CASE WHEN jsonb_typeof(obj->'multihit') = 'array' THEN obj->'multihit'->1 ELSE obj->'multihit' END,
+			'max_move_base_power', CASE
+				WHEN obj->'maxMove'->'basePower' IS NOT NULL THEN (obj->'maxMove'->'basePower')::smallint
+				WHEN obj->>'category' = 'Status' OR obj->'isMax' IS NOT NULL OR obj->'isZ' IS NOT NULL OR obj->>'alias' = 'struggle' THEN NULL
+				WHEN obj->'basePower' IS NULL THEN 100
+				WHEN obj->>'type' IN ('Fighting', 'Poison') THEN
+					CASE
+						WHEN (obj->'basePower')::smallint >= 150 THEN 100
+						WHEN (obj->'basePower')::smallint >= 110 THEN 95
+						WHEN (obj->'basePower')::smallint >= 75 THEN 90
+						WHEN (obj->'basePower')::smallint >= 65 THEN 85
+						WHEN (obj->'basePower')::smallint >= 55 THEN 80
+						WHEN (obj->'basePower')::smallint >= 45 THEN 75
+						ELSE 70
+					END
+				ELSE
+					CASE
+						WHEN (obj->'basePower')::smallint >= 150 THEN 150
+						WHEN (obj->'basePower')::smallint >= 110 THEN 140
+						WHEN (obj->'basePower')::smallint >= 75 THEN 130
+						WHEN (obj->'basePower')::smallint >= 65 THEN 120
+						WHEN (obj->'basePower')::smallint >= 55 THEN 110
+						WHEN (obj->'basePower')::smallint >= 45 THEN 100
+						ELSE 90
+					END
+			END
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys, obj;
 

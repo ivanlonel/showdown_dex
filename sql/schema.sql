@@ -114,16 +114,16 @@ EXCEPTION
 END $$;
 
 DO $$ BEGIN
-	CREATE TYPE enum_move_source AS ENUM('M', 'T', 'L', 'R', 'E', 'D', 'S', 'V');
+	CREATE TYPE enum_move_source AS ENUM('L', 'M', 'T', 'R', 'E', 'D', 'V', 'S');
 	COMMENT ON TYPE enum_move_source IS '{
+		"L": "start or level-up; Column lvl must not be NULL.",
 		"M": "TM/HM",
 		"T": "tutor",
-		"L": "start or level-up; Column lvl must not be NULL.",
 		"R": "restricted (special moves like Rotom moves)",
 		"E": "egg",
 		"D": "Dream World; Only 5D is valid.",
-		"S": "event; Column event_index must not be NULL.",
-		"V": "Virtual Console or Let''s Go transfer; Only 7V/8V is valid."
+		"V": "Virtual Console or Let''s Go transfer; Only 7V/8V is valid.",
+		"S": "event; Column event_index must not be NULL."
 	}';
 EXCEPTION
 	WHEN duplicate_object THEN NULL;
@@ -355,6 +355,7 @@ CREATE TABLE IF NOT EXISTS t_move (
 	force_switch boolean,
 	self_switch text,
 	self_boost type_boosts,
+	boosts type_boosts,
 	selfdestruct text,
 	breaks_protect boolean,
 	recoil numeric,  -- the original array represents numerator and denominator of a fraction
@@ -778,7 +779,7 @@ CREATE TABLE IF NOT EXISTS pokemon_event_move (
 	pokemon_id text,
 	event_index smallint,
 	move_id text REFERENCES t_move,
-	move_slot smallint CHECK (move_slot >= 0 AND move_slot <= 3),
+	move_slot smallint,
 	PRIMARY KEY (pokemon_id, event_index, move_id),
 	FOREIGN KEY (pokemon_id, event_index) REFERENCES pokemon_event,
 	UNIQUE (pokemon_id, event_index, move_slot)
@@ -870,7 +871,7 @@ CREATE TABLE IF NOT EXISTS moveset_nature (
 );
 
 
-CREATE OR REPLACE VIEW v_learnsets_including_prevos AS
+CREATE OR REPLACE VIEW v_learnset_including_prevos AS
 	WITH RECURSIVE cte AS (
 			SELECT
 				*,
@@ -902,7 +903,7 @@ CREATE OR REPLACE VIEW v_learnsets_including_prevos AS
 		lvl,
 		original_id
 	FROM cte C
-	ORDER BY pokemon_id, move_id, generation, source_id, event_index, recursive_depth;
+	ORDER BY pokemon_id, move_id, generation DESC, source_id, event_index, recursive_depth;
 --	WHERE NOT EXISTS (
 --		SELECT 1
 --		FROM cte X
@@ -910,6 +911,81 @@ CREATE OR REPLACE VIEW v_learnsets_including_prevos AS
 --			AND X.event_index IS NOT DISTINCT FROM C.event_index
 --			AND X.recursive_depth < C.recursive_depth
 --	);
+
+
+CREATE OR REPLACE VIEW v_learnset_complete AS
+(
+	SELECT L.*
+	FROM v_learnset_including_prevos L
+--		INNER JOIN pokemon P
+--			USING(pokemon_id)
+--		INNER JOIN pokemon_forme PF
+--			USING (species_num, forme_index)
+--	ORDER BY
+--		CASE WHEN species_num > 0 THEN species_num ELSE 20000 - species_num END,
+--		forme_index,
+--		pokemon_id,
+--		move_id,
+--		generation DESC,
+--		source_id,
+--		event_index
+) UNION ALL (
+	SELECT
+		NULL AS learnset_id,
+		S.pokemon_id,
+		move_id,
+		generation,
+		source_id,
+		event_index,
+		lvl,
+		COALESCE(learnset_id, original_id) AS original_id
+	FROM v_learnset_including_prevos
+		INNER JOIN pokemon P
+			USING(pokemon_id)
+		INNER JOIN pokemon_forme PF
+			USING (species_num, forme_index)
+		INNER JOIN (
+			SELECT species_num, forme_index, pokemon_id
+			FROM pokemon P
+				LEFT JOIN pokemon_forme PF
+					USING (species_num, forme_index)
+			WHERE (
+				NOT EXISTS (SELECT 1 FROM learnset L WHERE L.pokemon_id = P.pokemon_id)
+				--AND left(PF.forme_name, 4) IS DISTINCT FROM 'Mega'
+				AND P.pokemon_name NOT LIKE '%-Gmax'
+			) OR (P.pokemon_id LIKE 'necrozmad%')
+			ORDER BY species_num, forme_index
+		) S
+			ON S.species_num = PF.species_num AND PF.is_base_forme IS TRUE
+--	ORDER BY
+--		CASE WHEN S.species_num > 0 THEN S.species_num ELSE 20000 - S.species_num END,
+--		S.forme_index,
+--		S.pokemon_id,
+--		move_id,
+--		generation DESC,
+--		source_id,
+--		event_index
+);
+
+
+CREATE OR REPLACE VIEW v_type_interactions AS
+	SELECT
+		defending,
+		array_agg(DISTINCT attacking) AS attacking,
+		multiplier
+	FROM (
+		SELECT DISTINCT
+			array_agg(DISTINCT L ORDER BY L) AS defending,
+			attacking,
+			CASE WHEN T1.defending = T2.defending THEN T1.multiplier ELSE T1.multiplier * T2.multiplier END AS multiplier
+		FROM type_x_type T1
+			LEFT JOIN type_x_type T2
+				USING (attacking)
+			CROSS JOIN LATERAL unnest(ARRAY[T1.defending, T2.defending]) L
+		GROUP BY T1.defending, T2.defending, attacking, T1.multiplier, T2.multiplier
+	) S
+	GROUP BY defending, multiplier
+	ORDER BY defending, multiplier DESC;
 
 
 CREATE OR REPLACE VIEW v_nature_multipliers AS
