@@ -22,7 +22,7 @@ def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
 
 def dict_of_dicts_2_iter_of_dicts(dict_of_dicts: Dict[Hashable, dict], key_name: str) -> Iterator[dict]:
 	for k, v in dict_of_dicts.items():
-		yield{key_name: k, **v}
+		yield {key_name: k, **v}
 
 # Maybe when pyjsparser gets extended support for ECMAScript 6 I can drop the regex in favor of a proper parser.
 def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list, Dict[str, Any]]:
