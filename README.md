@@ -4,12 +4,13 @@
 
 Clone repository and initialize submodule
 ```bash
-git clone https://github.com/ivanlonel/showdown_dex.git
+git clone --recurse-submodules https://github.com/ivanlonel/showdown_dex.git
 cd showdown_dex
+# If you forgot --recurse-submodules on git-clone, run this:
 git submodule update --init --recursive
 ```
 
-You may need to install python3-venv for the next step. For example, in Debian:
+You may need to install python3-venv for the next step. For example, on Debian:
 ```bash
 sudo apt update && sudo apt install python3-venv
 ```
@@ -36,7 +37,7 @@ Fire up the database. Unless you're using Docker Desktop with WSL, you must have
 sudo docker-compose up --detach
 ```
 
-ETL data from .json and .ts files into the database
+ETL data from json and ts files into the database
 ```bash
 python showdown_dex.py
 ```
