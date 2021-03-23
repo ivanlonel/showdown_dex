@@ -4,6 +4,7 @@ import logging
 from logging.handlers import QueueHandler, QueueListener
 from contextlib import contextmanager
 
+
 class LocalQueueHandler(QueueHandler):
 	def emit(self, record: logging.LogRecord) -> None:
 		# There is no need to self.prepare() records that go into a local, in-process queue.
@@ -15,24 +16,25 @@ class LocalQueueHandler(QueueHandler):
 		except Exception:
 			self.handleError(record)
 
+
 def setup_logging_queue(name=None, local=False):
 	logger = logging.getLogger(name)
 
 	# Remove logger's current handlers to pass them to the queue listener
 	handlers = []
-	for h in logger.handlers[:]:
-		logger.removeHandler(h)
-		handlers.append(h)
+	for handler in logger.handlers[:]:
+		logger.removeHandler(handler)
+		handlers.append(handler)
 
 	# Log to a queue instead of doing blocking I/O
 	que = queue.SimpleQueue()  # fast reentrant queue implementation without task tracking (not needed for logging)
 	logger.addHandler(LocalQueueHandler(que) if local else QueueHandler(que))
 
 	if not handlers:
-		h = logging.StreamHandler()
-		h.setLevel(logging.DEBUG)
-		h.setFormatter(logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s'))
-		handlers.append(h)
+		handler = logging.StreamHandler()
+		handler.setLevel(logging.DEBUG)
+		handler.setFormatter(logging.Formatter('%(asctime)s [%(name)s] %(levelname)s: %(message)s'))
+		handlers.append(handler)
 		logger.warning(f'No log handler provided. Using default. Logger level = {logging.getLevelName(logger.level)}')
 
 	# Set up a listener that will monitor the queue and run the blocking I/O in a separate thread 

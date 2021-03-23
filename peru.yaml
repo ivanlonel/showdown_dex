@@ -1,0 +1,5 @@
+imports:
+    asyncio_logging: ./
+
+git module asyncio_logging:
+    url: https://gist.github.com/ea02aa1549066526f241e6d1bed65c47.git
