@@ -1,0 +1,6 @@
+\set VERBOSITY verbose
+\set ON_ERROR_STOP on
+
+CREATE DATABASE showdown_dex;
+CREATE USER dex WITH PASSWORD '1234';
+GRANT CREATE ON DATABASE showdown_dex TO dex;

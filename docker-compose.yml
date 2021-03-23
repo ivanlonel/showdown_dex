@@ -1,0 +1,32 @@
+version: "3.7"
+
+services:
+    postgres:
+        image: postgres:13-alpine
+        command:
+            - postgres
+            - -c
+            - logging_collector=on
+            - -c
+            - log_filename=postgresql-%a.log
+            - -c
+            - log_rotation_age=1440
+            - -c
+            - log_truncate_on_rotation=on
+            - -c
+            - track_counts=on
+            - -c
+            - autovacuum=on
+        environment:
+            - POSTGRES_PASSWORD=postgres
+        ports:
+            - 5432:5432
+        restart: always
+        shm_size: 2gb
+        stop_grace_period: 1m30s
+        volumes:
+            - dex_data:/var/lib/postgresql/data
+            - ../sql/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+    dex_data:
