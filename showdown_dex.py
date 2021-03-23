@@ -9,6 +9,7 @@ import aiosql  # https://github.com/nackjicholson/aiosql
 import orjson
 import regex
 from extract_json_from_ts import dict_of_dicts_2_iter_of_dicts, extract_json_from_ts
+from logging_queue import log_via_queue
 
 def camel_to_snake_case(name):
 	return regex.sub('((?<=[a-z0-9])[A-Z]|(?!^)(?<!_)[A-Z](?=[a-z]))', r'_\1', name).lower()
@@ -105,10 +106,11 @@ async def main():
 
 
 if __name__ == '__main__':
-	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
 
 	with contextlib.suppress(ModuleNotFoundError):
 		import uvloop  # Unavailable on Windows, optional on Unix.
 		asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-	asyncio.run(main())
+	with log_via_queue(local=True):
+		asyncio.run(main())

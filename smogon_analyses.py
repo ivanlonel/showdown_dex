@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import aiofiles
 import tenacity
+from logging_queue import log_via_queue
 
 def load_nested_strings_as_json(jso):
 	if isinstance(jso, dict):
@@ -78,28 +79,17 @@ async def main():
 
 
 if __name__ == '__main__':
-	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
 
 	try:
 		import uvloop  # Unavailable on Windows, optional on Unix.
 	except ModuleNotFoundError:
-		# aiohttp version 3.6.2 raises RuntimeError('Event loop is closed') at the end on Windows if using ProactorEventLoop (which is the default on Windows in Python 3.8+).
-		if sys.platform.startswith('win') and sys.version_info[:2] >= (3, 8):
+		# aiohttp 3 raises RuntimeError('Event loop is closed') at the end on Windows if using ProactorEventLoop (which is the default on Windows in Python 3.8+).
+		if sys.platform.startswith('win') and sys.version_info[:2] >= (3, 8) and int(aiohttp.__version__.split('.')[0]) < 4:
 			# Force use of SelectorEventLoop
 			asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 	else:
 		asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-	asyncio.run(main())  # Python 3.7+ only. Use code below for 3.6-
-
-#	loop = asyncio.get_event_loop()
-#	loop.run_until_complete(main())
-#
-#	# Zero-sleep to allow underlying connections to close.
-#	# Will eventually become obsolete when the asyncio internals are changed
-#	# so that aiohttp itself can wait on the underlying connection to close.
-#	# Please follow issue #1925 for the progress on this:
-#	# https://github.com/aio-libs/aiohttp/issues/1925
-#	loop.run_until_complete(asyncio.sleep(0))
-#
-#	loop.close()
+	with log_via_queue(local=True):
+		asyncio.run(main())
