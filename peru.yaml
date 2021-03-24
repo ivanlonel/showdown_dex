@@ -1,5 +1,11 @@
 imports:
     asyncio_logging: ./
+    common_sequences: ./
+
 
 git module asyncio_logging:
     url: https://gist.github.com/ea02aa1549066526f241e6d1bed65c47.git
+
+git module common_sequences:
+    url: https://gist.github.com/63e80a89a6109c2af61673d31e75be9e.git
+
