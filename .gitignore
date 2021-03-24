@@ -130,3 +130,9 @@ dmypy.json
 
 # Peru dependency manager
 .peru/
+
+# Visual Studio Code project settings
+.vscode/
+
+# Project-specific folder where json files are dumped
+/json/
