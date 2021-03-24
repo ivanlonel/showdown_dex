@@ -1,13 +1,15 @@
+from __future__ import annotations
+from typing import Any, Hashable, Union
+from collections.abc import Iterable, Iterator
 import json
 import hjson  # https://github.com/hjson/hjson-py
 import regex
 import logging
-from typing import Any, Dict, Generator, Hashable, Iterable, Iterator, Union
 from shortest_common_supersequence import shortest_common_supersequence, longest_common_subsequence
 
 
 # functools.reduce may exceed maximum recursion depth when function is a generator, so let's force iteration
-def reduce_generator(generator_func: Generator[Any, None, None], iterable: Iterable[Any]) -> list:
+def reduce_generator(generator_func: Iterator[Any], iterable: Iterable[Any]) -> list:
     iterator = iter(iterable)
     accumulated = next(iterator)
     for element in iterator:
@@ -28,12 +30,12 @@ def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
 		yield {**template, **dic}
 
 
-def dict_of_dicts_2_iter_of_dicts(dict_of_dicts: Dict[Hashable, dict], key_name: str) -> Iterator[dict]:
+def dict_of_dicts_2_iter_of_dicts(dict_of_dicts: dict[Hashable, dict], key_name: str) -> Iterator[dict]:
 	for k, v in dict_of_dicts.items():
 		yield {key_name: k, **v}
 
 # Maybe when pyjsparser gets extended support for ECMAScript 6 I can drop the regex in favor of a proper parser.
-def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list, Dict[str, Any]]:
+def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list, dict[str, Any]]:
 	trimmed_str = ''.join(ts_str.split(' = ', 1)[1:]).rsplit('}', 1)[0] + '}'
 	functionless_str = regex.sub(
 		r'^(\s+)[^\d\W]\w*\s*\(.*?\)\s*\{(?:\s+?|.+?\n\1)\},?',

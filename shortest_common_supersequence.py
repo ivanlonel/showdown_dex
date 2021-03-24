@@ -1,6 +1,8 @@
+from __future__ import annotations
+from typing import Any
+from collections.abc import Iterable, Iterator
 import difflib
 import itertools
-from typing import Any, Iterable, Iterator
 
 def longest_common_subsequence(seq1: Iterable[Any], seq2: Iterable[Any]) -> Iterator[Any]:
     a = list(seq1)
