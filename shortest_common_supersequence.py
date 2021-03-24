@@ -1,6 +1,6 @@
 import difflib
 import itertools
-from typing import Any, Generator, Iterable, Iterator
+from typing import Any, Iterable, Iterator
 
 def longest_common_subsequence(seq1: Iterable[Any], seq2: Iterable[Any]) -> Iterator[Any]:
     a = list(seq1)
@@ -41,12 +41,3 @@ def shortest_common_supersequence(seq1: Iterable[Any], seq2: Iterable[Any]) -> I
     # yield remaining elements
     yield from X
     yield from Y
-
-
-# functools.reduce may exceed maximum recursion depth when function is a generator, so let's force iteration
-def reduce_generator(generator_func: Generator[Any, None, None], iterable: Iterable[Any]) -> list:
-    iterator = iter(iterable)
-    accumulated = next(iterator)
-    for element in iterator:
-        accumulated = list(generator_func(accumulated, element))
-    return accumulated

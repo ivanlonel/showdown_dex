@@ -2,9 +2,17 @@ import json
 import hjson  # https://github.com/hjson/hjson-py
 import regex
 import logging
-from typing import Any, Dict, Hashable, Iterable, Iterator, Union
-from shortest_common_supersequence import shortest_common_supersequence, longest_common_subsequence, reduce_generator
+from typing import Any, Dict, Generator, Hashable, Iterable, Iterator, Union
+from shortest_common_supersequence import shortest_common_supersequence, longest_common_subsequence
 
+
+# functools.reduce may exceed maximum recursion depth when function is a generator, so let's force iteration
+def reduce_generator(generator_func: Generator[Any, None, None], iterable: Iterable[Any]) -> list:
+    iterator = iter(iterable)
+    accumulated = next(iterator)
+    for element in iterator:
+        accumulated = list(generator_func(accumulated, element))
+    return accumulated
 
 def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
 	list_of_dicts = list(dicts)
@@ -37,7 +45,7 @@ def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list
 
 
 if __name__ == '__main__':
-	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
 
 	for filename in ('typechart', 'abilities', 'text/abilities', 'items', 'text/items', 'moves', 'text/moves', 'pokedex', 'text/pokedex', 'learnsets'):
 		with open(f'./pokemon-showdown/data/{filename}.ts', 'r') as f:
