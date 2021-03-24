@@ -1,6 +1,7 @@
 import sys
 import json
 import regex
+import pathlib
 import logging
 import asyncio
 import aiohttp
@@ -44,6 +45,8 @@ async def main():
 	LANGUAGE = 'en'
 	MAX_SIM_CONNS = 64
 
+	pathlib.Path('json').mkdir(exist_ok=True) 
+
 	async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
 		json_gens = await fetch(session, f'{URL}/dump-gens')
 
@@ -51,7 +54,7 @@ async def main():
 
 		logging.debug(f'Gens: {gens}')
 
-		async with aiofiles.open(f'json/smogon_gens.json', 'w', newline='', encoding='utf-8') as fd:
+		async with aiofiles.open('json/smogon_gens.json', 'w', newline='', encoding='utf-8') as fd:
 			#await fd.write(ujson.dumps(json_gens, ensure_ascii=False, indent='\t'))
 			await fd.write(json.dumps(json_gens, ensure_ascii=False, separators=(',', ':')))
 
@@ -60,7 +63,7 @@ async def main():
 		tasks_basics = (asyncio.create_task(bound_fetch(session, sem, f'{URL}/dump-basics', json={'gen': gen.lower()})) for gen in gens)
 		json_basics = [{**item['request'], **item['response']} for item in await asyncio.gather(*tasks_basics)]
 
-		async with aiofiles.open(f'json/smogon_basics.json', 'w', newline='', encoding='utf-8') as fd:
+		async with aiofiles.open('json/smogon_basics.json', 'w', newline='', encoding='utf-8') as fd:
 			#await fd.write(ujson.dumps(json_basics, ensure_ascii=False, indent='\t'))
 			await fd.write(json.dumps(json_basics, ensure_ascii=False, separators=(',', ':')))
 
@@ -71,7 +74,7 @@ async def main():
 		tasks_multilang = (asyncio.create_task(bound_fetch(session, sem, f'{URL}/dump-pokemon', json={'gen': analysis['gen'], 'language': lang, 'alias': analysis['alias']})) for analysis in json_pokemon for lang in analysis['languages'] if lang != LANGUAGE)
 		json_multilang = [{**item['request'], **item['response']} for item in await asyncio.gather(*tasks_multilang) if item['response'] is not None]
 
-	async with aiofiles.open(f'json/smogon_analyses.json', 'w', newline='', encoding='utf-8') as fd:
+	async with aiofiles.open('json/smogon_analyses.json', 'w', newline='', encoding='utf-8') as fd:
 		#await fd.write(ujson.dumps([*json_pokemon, *json_multilang], ensure_ascii=False, indent='\t'))
 		await fd.write(json.dumps([*json_pokemon, *json_multilang], ensure_ascii=False, separators=(',', ':')))
 
