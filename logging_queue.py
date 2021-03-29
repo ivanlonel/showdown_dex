@@ -42,8 +42,7 @@ def setup_logging_queue(name=None, local=False):
 
 
 @contextmanager
-def log_via_queue(*args, **kwargs):
-	listener = setup_logging_queue(*args, **kwargs)
+def listen(listener):
 	listener.start()
 	try:
 		yield listener
@@ -57,6 +56,7 @@ if __name__ == '__main__':
 		logging.info(await asyncio.sleep(1, 'Finished!'))
 
 	logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
+	log_listener = setup_logging_queue(local=True)
 
-	with log_via_queue(local=True):
+	with listen(listener=log_listener):
 		asyncio.run(test_coro())
