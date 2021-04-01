@@ -181,7 +181,7 @@ INSERT INTO t_move
 		) AS jsonb_with_renamed_keys
 	GROUP BY jsonb_with_renamed_keys, obj;
 
-INSERT INTO move_flags 
+INSERT INTO move_flags
 	SELECT (jsonb_populate_record(null::move_flags, jsonb_set(obj->'flags', '{move_id}', obj->'alias'))).*
 	FROM tmp_moves
 	WHERE obj->'flags' @? '$.*';  -- obj->'flags' IS NOT NULL AND obj->'flags' <> '{}'::jsonb;
@@ -336,10 +336,10 @@ INSERT INTO item_priority
 			) AS J(k, v),
 			LATERAL jsonb_build_object(
 				'item_id', obj->'alias',
-				'on_ally_modify_spa_priority', obj->'onAllyModifySpAPriority', 
-				'on_ally_modify_spd_priority', obj->'onAllyModifySpDPriority', 
-				'on_modify_spa_priority', obj->'onModifySpAPriority',     
-				'on_modify_spd_priority', obj->'onModifySpDPriority',     
+				'on_ally_modify_spa_priority', obj->'onAllyModifySpAPriority',
+				'on_ally_modify_spd_priority', obj->'onAllyModifySpDPriority',
+				'on_modify_spa_priority', obj->'onModifySpAPriority',
+				'on_modify_spd_priority', obj->'onModifySpDPriority',
 				'on_source_modify_spa_priority', obj->'onSourceModifySpAPriority'
 			) AS jsonb_with_renamed_keys
 		GROUP BY jsonb_with_renamed_keys
@@ -497,7 +497,7 @@ CREATE TEMPORARY TABLE tmp_events ON COMMIT DROP AS
 		LATERAL jsonb_array_elements(obj->'eventData') WITH ORDINALITY
 	WHERE --NOT
 		EXISTS(SELECT 1 FROM pokemon P WHERE obj->>'alias' = P.pokemon_id);
-	
+
 ANALYZE tmp_events; -- temp tables are not auto-analyzed!
 
 ALTER TABLE tmp_events ADD PRIMARY KEY (pokemon_id, event_index);
@@ -537,7 +537,7 @@ INSERT INTO pokemon_event_move (pokemon_id, event_index, move_id, move_slot)
 		LATERAL jsonb_array_elements_text(jb_event->'moves') WITH ORDINALITY;
 
 INSERT INTO learnset (pokemon_id, move_id, generation, source_id, event_index, lvl)
-	SELECT 
+	SELECT
 		obj->>'alias',
 		L1.key,
 		SUBSTRING(L2.value FROM '^\d+')::smallint,
@@ -587,7 +587,7 @@ CREATE TEMPORARY TABLE tmp_movesets ON COMMIT DROP AS
 		LEFT JOIN analysis A
 			ON A.pokemon_id = CASE L1.value->>'alias' WHEN 'meowstic-m' THEN 'meowstic' ELSE replace(L1.value->>'alias', '-', '') END
 			AND (A.gen, A.lang, A.format) = (G.gen_id, L1.value->>'language', L2.value->>'format');
-	
+
 ANALYZE tmp_movesets; -- temp tables are not auto-analyzed!
 
 ALTER TABLE tmp_movesets ADD PRIMARY KEY (analysis_id, moveset_index);
@@ -679,5 +679,5 @@ INSERT INTO moveset_nature (analysis_id, moveset_index, nature_name)
 		value
 	FROM tmp_movesets,
 		LATERAL jsonb_array_elements_text(jb_moveset->'natures');
-		
+
 DROP TABLE IF EXISTS tmp_movesets;

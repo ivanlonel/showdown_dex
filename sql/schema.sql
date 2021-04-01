@@ -346,7 +346,7 @@ CREATE TABLE IF NOT EXISTS t_move (
 	no_pp_boosts boolean,
 	is_z text,  -- REFERENCES item (item_id) DEFERRABLE INITIALLY DEFERRED,
 	z_move jsonb,
-	is_max boolean CHECK (is_max IS NULL OR is_gmax IS NULL), 
+	is_max boolean CHECK (is_max IS NULL OR is_gmax IS NULL),
 	is_gmax text,  -- REFERENCES pokemon (pokemon_id) DEFERRABLE INITIALLY DEFERRED,
 	max_move_base_power smallint,
 	ohko text,
@@ -523,23 +523,23 @@ CREATE TABLE IF NOT EXISTS pokemon_forme (
 	pokemon_name text UNIQUE NOT NULL,  -- The original "name" field of the pokemon with this form OR the name that appears inside "cosmeticFormes"
 	is_cosmetic boolean NOT NULL,
 	is_base_forme boolean NOT NULL,  -- Not redundant. Minior's base forme's forme_index is 1 instead of 0.
-    required_ability text REFERENCES ability (ability_id),
-    required_move text REFERENCES t_move (move_id),
-    is_battle_only boolean NOT NULL,  -- Originally either a string or an array (see Zygarde-Complete and Necrozma-Ultra). See table "pokemon_forme_battle_only".
-    changes_from text REFERENCES pokemon_forme (pokemon_name),  -- Currently only differs from baseSpecies when dealing with Pikachu-Cosplay.
+	required_ability text REFERENCES ability (ability_id),
+	required_move text REFERENCES t_move (move_id),
+	is_battle_only boolean NOT NULL,  -- Originally either a string or an array (see Zygarde-Complete and Necrozma-Ultra). See table "pokemon_forme_battle_only".
+	changes_from text REFERENCES pokemon_forme (pokemon_name),  -- Currently only differs from baseSpecies when dealing with Pikachu-Cosplay.
 	PRIMARY KEY (species_num, forme_index)
 );
 
 /*
  * See the file FORMES.md in directory pokemon-showdown/data
- * 
+ *
  * This SHOULD contain only these kind of formes:
  * - "Regular" formes (Galarian and Alolan regional formes, Wormadam formes etc)
  * - Visual formes
  * - Formes changeable out-of-battle (this is where "changesFrom" property kicks in. May also have "requiredItem" property.)
  * - In-battle formes (this is where "battleOnly" property kicks in. May also have "requiredItem"/"requiredAbility"/"requiredMove" properties.)
  * - Visual in-battle formes (Cherrim, Cramorant, Mimikyu - Pokemon Showdown treats these like regular in-battle formes)
- * 
+ *
  * THIS SHOULD NOT contain these kind of formes:
  * - Cosmetic formes
  * - "Fake" visual in-battle formes (Dynamax/Gigantamax changes.)
@@ -550,24 +550,24 @@ CREATE TABLE IF NOT EXISTS pokemon_forme (
  * Therefore, there may be holes in the sequence, since cosmetic formes appear in formeOrder array but not in this table
  */
 CREATE TABLE IF NOT EXISTS pokemon (
-    pokemon_id text PRIMARY KEY,  -- should always be = to_id(pokemon_name)
-    species_num smallint NOT NULL REFERENCES base_species,
-    forme_index smallint,  -- can't be part of a PRIMARY KEY because it can be null
-    pokemon_name text UNIQUE NOT NULL,  -- not sure why even use an alias (pokemon_id) if this is UNIQUE and NOT NULL
-    female_ratio numeric(4, 3) NOT NULL,  -- Use 'NaN' for genderless. Pokémon without gender info on original dataset can be presumed 50/50, I guess.
-    base_stats type_stats NOT NULL,
-    heightm numeric NOT NULL,
-    weightkg numeric NOT NULL,
-    color enum_color NOT NULL,
-    can_hatch boolean,
-    can_gigantamax text REFERENCES t_move (move_id),
-    cannot_dynamax boolean,
-    gen smallint REFERENCES generation (gen_id),
-    unreleased_hidden enum_unreleased,  -- can be either 'false', 'true' or 'Past'.
-    max_hp smallint,
-    event_only boolean,
-    UNIQUE (species_num, forme_index),
-    FOREIGN KEY (species_num, forme_index) REFERENCES pokemon_forme
+	pokemon_id text PRIMARY KEY,  -- should always be = to_id(pokemon_name)
+	species_num smallint NOT NULL REFERENCES base_species,
+	forme_index smallint,  -- can't be part of a PRIMARY KEY because it can be null
+	pokemon_name text UNIQUE NOT NULL,  -- not sure why even use an alias (pokemon_id) if this is UNIQUE and NOT NULL
+	female_ratio numeric(4, 3) NOT NULL,  -- Use 'NaN' for genderless. Pokémon without gender info on original dataset can be presumed 50/50, I guess.
+	base_stats type_stats NOT NULL,
+	heightm numeric NOT NULL,
+	weightkg numeric NOT NULL,
+	color enum_color NOT NULL,
+	can_hatch boolean,
+	can_gigantamax text REFERENCES t_move (move_id),
+	cannot_dynamax boolean,
+	gen smallint REFERENCES generation (gen_id),
+	unreleased_hidden enum_unreleased,  -- can be either 'false', 'true' or 'Past'.
+	max_hp smallint,
+	event_only boolean,
+	UNIQUE (species_num, forme_index),
+	FOREIGN KEY (species_num, forme_index) REFERENCES pokemon_forme
 );
 
 CREATE TABLE IF NOT EXISTS item (
@@ -716,10 +716,10 @@ CREATE TABLE IF NOT EXISTS pokemon_evo (
 	pokemon_id text REFERENCES pokemon,
 	evo_id text PRIMARY KEY REFERENCES pokemon (pokemon_id),
 	evo_level smallint,
-    evo_type enum_evo_type,
-    evo_item text REFERENCES item (item_id),
-    evo_move text REFERENCES t_move (move_id),
-    evo_condition text
+	evo_type enum_evo_type,
+	evo_item text REFERENCES item (item_id),
+	evo_move text REFERENCES t_move (move_id),
+	evo_condition text
 );
 
 CREATE TABLE IF NOT EXISTS pokemon_text (
