@@ -5,7 +5,7 @@ imports:
 
 git module asyncio_logging:
   url: https://gist.github.com/ea02aa1549066526f241e6d1bed65c47.git
-  rev: 1f5919193aac2c0c9bf3a304f5b88be34d7992e4
+  rev: 7dfac8106452de2744a4a845707c28df7b7fa4ff
 
 git module common_sequences:
   url: https://gist.github.com/63e80a89a6109c2af61673d31e75be9e.git
