@@ -16,6 +16,7 @@ def reduce_generator(generator_func: Iterator[Any], iterable: Iterable[Any]) -> 
         accumulated = list(generator_func(accumulated, element))
     return accumulated
 
+
 def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
     list_of_dicts = list(dicts)
 
@@ -33,6 +34,7 @@ def standardize(dicts: Iterable[dict]) -> Iterator[dict]:
 def dict_of_dicts_2_iter_of_dicts(dict_of_dicts: dict[Hashable, dict], key_name: str) -> Iterator[dict]:
     for k, v in dict_of_dicts.items():
         yield {key_name: k, **v}
+
 
 # TO-DO: See if I can use https://github.com/Kronuz/esprima-python to replace the regex by an actual parser.
 def extract_json_from_ts(ts_str: str) -> Union[str, int, float, bool, None, list, dict[str, Any]]:
@@ -60,5 +62,5 @@ if __name__ == '__main__':
         logging.debug(list(reduce_generator(longest_common_subsequence, (d.keys() for d in dicts))))
 
         with open(f'./json/{filename}.json', 'w', encoding='utf-8') as f:
-            # json.dump(list(standardize(dicts)), f, ensure_ascii=False, indent='\t')
-            json.dump(dicts, f, ensure_ascii=False, indent='\t')
+            # json.dump(list(standardize(dicts)), f, ensure_ascii=False, indent=2)
+            json.dump(dicts, f, ensure_ascii=False, indent=2)
