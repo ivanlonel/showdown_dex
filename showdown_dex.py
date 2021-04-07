@@ -10,8 +10,10 @@ import regex
 from extract_json_from_ts import dict_of_dicts_2_iter_of_dicts, extract_json_from_ts
 from logging_queue import log_via_queue
 
+
 def camel_to_snake_case(name):
     return regex.sub('((?<=[a-z0-9])[A-Z]|(?!^)(?<!_)[A-Z](?=[a-z]))', r'_\1', name).lower()
+
 
 async def init_tmp_table(conn, file_path, each_file_line_is_a_json_object=False):
     tmp = f'tmp_{file_path.stem}'
@@ -37,12 +39,12 @@ async def init_tmp_table(conn, file_path, each_file_line_is_a_json_object=False)
     logging.debug(f'{file_path.stem}: {result}')
     return result
 
-async def main():
-    path = pathlib.Path('.')
-    queries = aiosql.from_path(path/'sql', 'asyncpg')
-    #logging.debug(queries.populate_pokedex.sql)
 
-    conn = await asyncpg.connect('postgresql://dex:1234@localhost:5432/showdown_dex')
+async def main(db, user, password, host='localhost', port=5432, path='.'):
+    path = pathlib.Path(path)
+    queries = aiosql.from_path(path / 'sql', 'asyncpg')
+
+    conn = await asyncpg.connect(f'postgresql://{user}:{password}@{host}:{port}/{db}')
 
     try:
         await conn.set_type_codec(
@@ -59,43 +61,43 @@ async def main():
 
         async with conn.transaction():
             try:
-                await init_tmp_table(conn, path/'json'/'smogon_gens.json', True)
+                await init_tmp_table(conn, path / 'json/smogon_gens.json', True)
             except FileNotFoundError:
                 logging.error('Json file not found. Make sure to run smogon_analyses.py first to create files smogon_gens.json and smogon_analyses.json.')
                 raise
             await queries.populate_generation(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'typechart.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/typechart.ts')
             await queries.populate_types(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'abilities.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/abilities.ts')
             await queries.populate_abilities(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'abilities.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/text/abilities.ts')
             await queries.populate_abilities_text(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'moves.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/moves.ts')
             await queries.populate_moves(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'moves.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/text/moves.ts')
             await queries.populate_moves_text(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'pokedex.ts')
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'items.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/pokedex.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/items.ts')
             await queries.populate_pokedex(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'pokedex.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/text/pokedex.ts')
             await queries.populate_pokedex_text(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'text'/'items.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/text/items.ts')
             await queries.populate_items_text(conn)
 
-            await init_tmp_table(conn, path/'pokemon-showdown'/'data'/'learnsets.ts')
+            await init_tmp_table(conn, path / 'pokemon-showdown/data/learnsets.ts')
             await queries.populate_learnsets(conn)
 
         async with conn.transaction():
             try:
-                await init_tmp_table(conn, path/'json'/'smogon_analyses.json', True)
+                await init_tmp_table(conn, path / 'json/smogon_analyses.json', True)
             except FileNotFoundError:
                 logging.error('Json file not found. Make sure to run smogon_analyses.py first to create files smogon_gens.json and smogon_analyses.json.')
                 raise
@@ -112,4 +114,4 @@ if __name__ == '__main__':
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
     with log_via_queue(local=True):
-        asyncio.run(main())
+        asyncio.run(main(db='showdown_dex', user='dex', password='1234'))
