@@ -9,9 +9,9 @@ from shortest_common_supersequence import shortest_common_supersequence, longest
 
 
 # functools.reduce may exceed maximum recursion depth when function is a generator, so let's force iteration
-def reduce_generator(generator_func: Iterator[Any], iterable: Iterable[Any]) -> list:
+def reduce_generator(generator_func: Iterator[Any], iterable: Iterable[Any], initializer=None) -> list:
     iterator = iter(iterable)
-    accumulated = next(iterator)
+    accumulated = initializer or next(iterator)
     for element in iterator:
         accumulated = list(generator_func(accumulated, element))
     return accumulated
