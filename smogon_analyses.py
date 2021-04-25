@@ -7,7 +7,7 @@ import asyncio
 import aiohttp
 import aiofiles
 import tenacity
-from logging_queue import log_via_queue
+from logging_queue import setup_logging_queue, listen
 
 
 def load_nested_strings_as_json(jso):
@@ -84,8 +84,6 @@ async def main(url='https://www.smogon.com/dex/_rpc', lang='en', max_sim_conns=6
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
-
     try:
         import uvloop  # Unavailable on Windows, optional on Unix.
     except ModuleNotFoundError:
@@ -97,5 +95,8 @@ if __name__ == '__main__':
     else:
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-    with log_via_queue(local=True):
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
+    log_listener = setup_logging_queue(local=True)
+
+    with listen(listener=log_listener):
         asyncio.run(main())

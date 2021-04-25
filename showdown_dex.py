@@ -8,7 +8,7 @@ import aiosql  # https://github.com/nackjicholson/aiosql
 import orjson
 import regex
 from extract_json_from_ts import dict_of_dicts_2_iter_of_dicts, extract_json_from_ts
-from logging_queue import log_via_queue
+from logging_queue import setup_logging_queue, listen
 
 
 def camel_to_snake_case(name):
@@ -107,11 +107,12 @@ async def main(db, user, password, host='localhost', port=5432, path='.'):
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
-
     with contextlib.suppress(ModuleNotFoundError):
         import uvloop  # Unavailable on Windows, optional on Unix.
         asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
-    with log_via_queue(local=True):
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(module)s, %(lineno)d] %(levelname)s: %(message)s')
+    log_listener = setup_logging_queue(local=True)
+
+    with listen(listener=log_listener):
         asyncio.run(main(db='showdown_dex', user='dex', password='1234'))
