@@ -1,6 +1,6 @@
 aiofiles~=0.7.0
 aiohttp>=3.7.4
-aiosql~=3.2.0
+aiosql~=3.2.1
 asyncpg~=0.23.0
 hjson~=3.0.2
 orjson~=3.5.4
