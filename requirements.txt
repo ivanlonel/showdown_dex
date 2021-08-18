@@ -1,10 +1,10 @@
 aiofiles~=0.7.0
 aiohttp>=3.7.4
-aiosql~=3.2.0
+aiosql~=3.3.1
 asyncpg~=0.23.0
 hjson~=3.0.2
 orjson~=3.5.4
 peru>=1.2.1
 regex>=2021.4.4
-tenacity~=7.0.0
+tenacity~=8.0.1
 uvloop~=0.16.0;platform_system!="Windows"
