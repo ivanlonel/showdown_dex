@@ -1,4 +1,4 @@
-aiofiles~=0.8.0
+aiofiles~=22.1.0
 aiohttp>=3.7.4
 aiosql~=6.3
 asyncpg~=0.26.0
