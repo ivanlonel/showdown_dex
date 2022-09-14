@@ -7,4 +7,4 @@ orjson~=3.8.0
 peru>=1.2.1
 regex>=2021.4.4
 tenacity~=8.0.1
-uvloop~=0.16.0;platform_system!="Windows"
+uvloop~=0.17.0;platform_system!="Windows"
