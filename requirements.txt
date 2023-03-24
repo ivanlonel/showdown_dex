@@ -6,5 +6,5 @@ hjson~=3.1.0
 orjson~=3.8.8
 peru>=1.2.1
 regex>=2021.4.4
-tenacity~=8.1.0
+tenacity~=8.2.2
 uvloop~=0.17.0;platform_system!="Windows"
